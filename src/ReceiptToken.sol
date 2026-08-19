@@ -3,7 +3,7 @@ pragma solidity ^0.8.27;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-contract ReceiptToken is ERC 20 {
+contract ReceiptToken is ERC20 {
     address public immutable vault;
 
     error OnlyVaultAllowed();
