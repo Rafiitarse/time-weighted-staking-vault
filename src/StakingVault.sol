@@ -8,90 +8,117 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 interface ITokenMintable {
     function mint(address to, uint256 amount) external;
     function burn(address from, uint256 amount) external;
+    function balanceOf(address account) external view returns (uint256);
 }
 
 contract StakingVault is ReentrancyGuard, Pausable, Ownable {
     ITokenMintable public receiptToken;
     ITokenMintable public rewardToken;
 
-    mapping(address => uint256) public depositTime;
-    mapping(address => uint256) public userBalance;
+    struct DepositLot {
+        uint256 amount;
+        uint256 timestamp;
+    }
 
-    event Deposited(address indexed user, uint256 amount);
+    mapping(address => DepositLot[]) public userLots;
+
+    event Deposited(address indexed user, uint256 amount, uint256 timestamp);
     event Withdrawn(address indexed user, uint256 amount, uint256 rewardAmount);
+    event TokensSet(address indexed receiptToken, address indexed rewardToken);
+
+    error ZeroAmount();
+    error InsufficientReceiptBalance();
+    error TransferFailed();
+    error TokensAlreadySet();
 
     constructor() Ownable(msg.sender) {}
 
-    function setTokens(address _receiptToken, address _rewardToken) external {
-        require(_receiptToken != address(0), "Token already set");
+    function setTokens(address _receiptToken, address _rewardToken) external onlyOwner {
+        require(address(receiptToken) == address(0), "Tokens already set");
         receiptToken = ITokenMintable(_receiptToken);
         rewardToken = ITokenMintable(_rewardToken);
+        emit TokensSet(_receiptToken, _rewardToken);
     }
 
-    function pause() external onlyOwner {
+    function pause() external onlyOwner{
         _pause();
     }
 
-    function unpause() external onlyOwner {
+    function unpause() external onlyOwner{
         _unpause();
     }
 
     function deposit() external payable whenNotPaused nonReentrant {
-        require(msg.value > 0, "Deposit amount must be greater than zero");
+        if (msg.value == 0) revert ZeroAmount();
 
-        if (userBalance[msg.sender] == 0) {
-            depositTime[msg.sender] = block.timestamp;
-        } else {
-            uint256 oldBalance = userBalance[msg.sender];
-            uint256 newBalance = oldBalance + msg.value;
-            depositTime[msg.sender] = block.timestamp - (
-                ((block.timestamp - depositTime[msg.sender]) * oldBalance) / newBalance
-            );
-        }
-        userBalance[msg.sender] += msg.value;
+        userLots[msg.sender].push(DepositLot({
+            amount: msg.value,
+            timestamp: block.timestamp
+        }));
 
         receiptToken.mint(msg.sender, msg.value);
 
-        emit Deposited(msg.sender, msg.value);
+        emit Deposited(msg.sender, msg.value, block.timestamp);
     }
 
-    function getMultiplier(address user) public view returns (uint256) {
-        if (userBalance[user] == 0) return 100;
+    function _calculateLotMultiplier(uint256 depositTimestamp) internal view returns (uint256) {
+        uint256 age = block.timestamp - depositTimestamp;
 
-        uint256 duration = block.timestamp - depositTime[user];
-
-        if (duration >= 90 days) {
+        if (age >= 183 days) {
+            return 150; // 2x Multiplier
+        } else if (age >= 366 days) {
             return 200;
-        } else if (duration >= 30 days) {
-            return 150;
+        } else if (age >= 549 days) {
+            return 250;
+        } else if (age >= 732 days) {
+            return 300;
+        } else if (age >= 915 days) {
+            return 350;
+        } else if (age >= 1098 days) {
+            return 400;
         } else {
-            return 100;
+            return 0;
         }
     }
 
     function withdraw(uint256 amount) external whenNotPaused nonReentrant {
-        require(amount > 0, "Withdraw amount must be greater than zero");
-        require(userBalance[msg.sender] >= amount, "Insufficient balance");
+        if (amount == 0) revert ZeroAmount();
+        if (receiptToken.balanceOf(msg.sender) < amount) revert InsufficientReceiptBalance();
 
-        receiptToken.burn(msg.sender, amount);
+        uint256 remainingToWithdraw = amount;
+        uint256 totalReward = 0;
 
-        uint256 baseReward = amount / 10;
-        uint256 multiplier = getMultiplier(msg.sender);
+        DepositLot[] storage lots = userLots[msg.sender];
 
-        uint256 finalReward = (baseReward * multiplier) / 100;
+        for (uint256 i = 0; i < lots.length && remainingToWithdraw > 0; i++) {
+            DepositLot storage currentLot = lots[i];
 
-        userBalance[msg.sender] -= amount;
+            if (currentLot.amount == 0) continue;
 
-        if (userBalance[msg.sender] == 0) {
-            depositTime[msg.sender] = 0;
+            uint256 takeAmount = remainingToWithdraw < currentLot.amount 
+                ? remainingToWithdraw 
+                : currentLot.amount;
+
+            uint256 multiplier = _calculateLotMultiplier(currentLot.timestamp);
+            
+            if (multiplier > 0) {
+                uint256 baseReward = takeAmount / 10; // 10% base
+                totalReward += (baseReward * multiplier) / 100;
+            }
+
+            currentLot.amount -= takeAmount;
+            remainingToWithdraw -= takeAmount;
         }
 
-        rewardToken.mint(msg.sender, finalReward);
+        receiptToken.burn(msg.sender, amount);
+        
+        if(totalReward > 0){
+            rewardToken.mint(msg.sender, totalReward);
+        }
 
         (bool success, ) = msg.sender.call{value: amount}("");
-        require(success, "Transfer failed");
+        if (!success) revert TransferFailed();
 
-        emit Withdrawn(msg.sender, amount, finalReward);
+        emit Withdrawn(msg.sender, amount, totalReward);
+        }
     }
-
-}

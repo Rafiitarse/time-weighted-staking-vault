@@ -14,6 +14,7 @@ contract ReceiptToken is ERC20 {
     }
 
     constructor(address _vault) ERC20("Staked ETH Receipt", "stETH") {
+        require(_vault != address(0), "Invalid vault address");
         vault = _vault;
     }
 
@@ -24,4 +25,13 @@ contract ReceiptToken is ERC20 {
     function burn(address from, uint256 amount) external onlyVault {
         _burn(from, amount);
     }
+    
+    function _update(address from, address to, uint256 value) internal override {
+    if (from != address(0) && to != address(0)) {
+        if (msg.sender != vault) {
+            revert OnlyVaultAllowed(); // Blokir transfer antar user biasa!
+        }
+    }
+    super._update(from, to, value);
+}
 }

@@ -14,6 +14,7 @@ contract RewardToken is ERC20 {
     }
 
     constructor(address _vault) ERC20("Reward Token", "RWD") {
+        require(_vault != address(0), "Invalid vault address");
         vault =  _vault;
     }
 
