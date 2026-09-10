@@ -1,0 +1,35 @@
+# ==========================================
+# 1. ENV & SECRETS
+# ==========================================
+.env
+.env.*
+!.env.example
+
+# ==========================================
+# 2. FOUNDRY / SMART CONTRACTS
+# ==========================================
+contracts/cache/
+contracts/out/
+contracts/.logs/
+
+# Broadcast logs (Simpan log deploy resmi, abaikan dry-run & local anvil)
+!contracts/broadcast
+contracts/broadcast/*/31337/
+contracts/broadcast/**/dry-run/
+
+# ==========================================
+# 3. FUTURE SUBGRAPH & FRONTEND
+# ==========================================
+subgraph/generated/
+subgraph/build/
+frontend/node_modules/
+frontend/.next/
+node_modules/
+
+# ==========================================
+# 4. SYSTEM & IDE
+# ==========================================
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
