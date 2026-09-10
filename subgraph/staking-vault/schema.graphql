@@ -1,55 +1,108 @@
-type Deposited @entity(immutable: true) {
+"""
+Represents a unique depositor into the StakingVault. Aggregates all of a
+user's deposit lots (see `DepositLot`) and their all-time totals.
+"""
+type User @entity(immutable: false){
+  "The user's wallet address"
   id: Bytes!
-  user: Bytes! # address
-  lotId: BigInt! # uint256
-  amount: BigInt! # uint256
-  timestamp: BigInt! # uint256
-  blockNumber: BigInt!
-  blockTimestamp: BigInt!
-  transactionHash: Bytes!
+
+  "Cumulative ETH the user has ever deposited into the vault, in wei (does not decrease on withdrawal)"
+  totalEthStaked: BigInt!
+
+  "Cumulative reward tokens the user has earned across all withdrawals, in wei"
+  totalRewardEarned: BigInt!
+
+  "All deposit lots ever opened by this user"
+  lots: [DepositLot!]! @derivedFrom(field: "user")
+
+  "All withdrawals ever made by this user"
+  withdrawals: [LotWithdrawal!]! @derivedFrom(field: "user")
 }
 
-type OwnershipTransferred @entity(immutable: true) {
-  id: Bytes!
-  previousOwner: Bytes! # address
-  newOwner: Bytes! # address
-  blockNumber: BigInt!
-  blockTimestamp: BigInt!
-  transactionHash: Bytes!
+"Lifecycle state of a single deposit lot"
+enum LotStatus {
+  "The lot still has ETH remaining (remainingAmount > 0)"
+  ACTIVE
+  "The lot has been fully withdrawn (remainingAmount == 0)"
+  CLOSED
 }
 
-type Paused @entity(immutable: true) {
-  id: Bytes!
-  account: Bytes! # address
-  blockNumber: BigInt!
-  blockTimestamp: BigInt!
-  transactionHash: Bytes!
+"""
+Represents a single deposit lot created by a call to `StakingVault.deposit()`.
+One `User` can own many lots, one per `deposit()` call. The on-chain `lotId`
+is the index into `userLots[user]`, which is the same value expected by
+`withdrawFromLot(lotId, amount)`.
+"""
+type DepositLot @entity(immutable: false) {
+  "userAddress-lotId, e.g. 0xabc123...-0"
+  id: ID!
+
+  "The owner of this deposit lot"
+  user: User!
+
+  "The on-chain lot index (matches userLots[user][lotId] and withdrawFromLot's lotId param)"
+  lotId: BigInt!
+
+  "The ETH amount originally deposited into this lot, in wei"
+  originalAmount: BigInt!
+
+  "The ETH amount still remaining in this lot after any partial withdrawals, in wei"
+  remainingAmount: BigInt!
+
+  "Block timestamp at which this lot was created (used for the age-based reward multiplier)"
+  depositTimestamp: BigInt!
+
+  "ACTIVE while remainingAmount > 0, CLOSED once fully withdrawn"
+  status: LotStatus!
+
+  "All withdrawals made against this lot"
+  withdrawals: [LotWithdrawal!]! @derivedFrom(field: "lot")
 }
 
-type TokensSet @entity(immutable: true) {
-  id: Bytes!
-  receiptToken: Bytes! # address
-  rewardToken: Bytes! # address
-  blockNumber: BigInt!
-  blockTimestamp: BigInt!
-  transactionHash: Bytes!
+"""
+Represents a single call to `StakingVault.withdrawFromLot()`, i.e. one
+`Withdrawn` event. Immutable — a withdrawal, once indexed, never changes.
+"""
+type LotWithdrawal @entity(immutable: true) {
+  "transactionHash-logIndex"
+  id: ID!
+
+  "The deposit lot this withdrawal was made from"
+  lot: DepositLot!
+
+  "The user who performed the withdrawal"
+  user: User!
+
+  "The amount of ETH withdrawn from the lot, in wei"
+  amountWithdrawn: BigInt!
+
+  "The amount of reward tokens minted for this withdrawal, in wei"
+  rewardAmount: BigInt!
+
+  "Block timestamp at which the withdrawal occurred"
+  timestamp: BigInt!
 }
 
-type Unpaused @entity(immutable: true) {
-  id: Bytes!
-  account: Bytes! # address
-  blockNumber: BigInt!
-  blockTimestamp: BigInt!
-  transactionHash: Bytes!
-}
+"""
+Singleton entity (id is always the literal string "global") aggregating
+protocol-wide statistics across every user of the vault.
+"""
+type ProtocolStat @entity(immutable: false) {
+  "Always 'global'"
+  id: ID!
 
-type Withdrawn @entity(immutable: true) {
-  id: Bytes!
-  user: Bytes! # address
-  lotId: BigInt! # uint256
-  amount: BigInt! # uint256
-  rewardAmount: BigInt! # uint256
-  blockNumber: BigInt!
-  blockTimestamp: BigInt!
-  transactionHash: Bytes!
+  "Cumulative ETH deposited into the vault by all users, in wei"
+  totalEthStakedAllUsers: BigInt!
+
+  "Cumulative reward tokens distributed to all users, in wei"
+  totalRewardsDistributed: BigInt!
+
+  "Total number of deposit lots ever created across all users"
+  totalLotsCreated: BigInt!
+
+  "Receipt token contract address, set via setTokens()"
+  receiptToken: Bytes
+
+  "Reward token contract address, set via setTokens()"
+  rewardToken: Bytes
 }
