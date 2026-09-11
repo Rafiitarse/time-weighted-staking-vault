@@ -1,0 +1,113 @@
+name: Staking Vault Protocol - Fullstack CI/CD
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  # ==========================================
+  # JOB 1: FRONTEND NEXT.JS (CI ONLY)
+  # ==========================================
+  frontend-ci:
+    name: Frontend - Build & Check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run build
+
+  # ==========================================
+  # JOB 2: SMART CONTRACTS (CI & CD)
+  # ==========================================
+  contracts-ci:
+    name: Contracts - Test & Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: foundry-rs/foundry-toolchain@v1
+      - run: forge build --sizes
+      - run: forge test -vvv
+
+  contracts-deploy:
+    name: Contracts - Deploy to Sepolia
+    needs: contracts-ci
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: foundry-rs/foundry-toolchain@v1
+      - env:
+          SEPOLIA_RPC_URL: ${{ secrets.SEPOLIA_RPC_URL }}
+          PRIVATE_KEY: ${{ secrets.SEPOLIA_PRIVATE_KEY }}
+          ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
+        run: |
+          forge script script/Deploy.s.sol:DeployScript \
+            --rpc-url $SEPOLIA_RPC_URL \
+            --private-key $PRIVATE_KEY \
+            --broadcast \
+            --verify \
+            -vvvv
+
+  # ==========================================
+  # JOB 3: SUBGRAPH (CI & CD)
+  # ==========================================
+  subgraph-ci:
+    name: Subgraph - Codegen & Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: subgraph
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: subgraph/package-lock.json
+      - run: npm ci
+      - run: npm run codegen
+      - run: npm run build
+
+  subgraph-deploy:
+    name: Subgraph - Deploy to Studio
+    needs: subgraph-ci
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: subgraph
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - run: npm ci
+      - run: npm run codegen
+      - name: Deploy Subgraph
+        env:
+          GRAPH_DEPLOY_KEY: ${{ secrets.GRAPH_DEPLOY_KEY }}
+          SUBGRAPH_SLUG: ${{ secrets.SUBGRAPH_SLUG }}
+        run: |
+          npx graph auth --studio $GRAPH_DEPLOY_KEY
+          npx graph deploy --studio $SUBGRAPH_SLUG --version-label v0.0.1

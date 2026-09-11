@@ -1,106 +1,204 @@
-```markdown
-# 🚀 Time-Weighted ETH Staking Vault Ecosystem
+<div align="center">
 
-A robust, time-weighted Ethereum staking vault built with Solidity and Foundry. Designed for long-term yield generation, this protocol rewards long-term holders by tracking individual deposit lots and scaling yield multipliers based on the precise age of each staked position.
-```
+# 🚀 Time-Weighted ETH Staking Vault
 
-![Smart Contracts](https://img.shields.io/badge/Smart_Contracts-Solidity_v0.8.27-363636?style=flat-square&logo=solidity)
-![Framework](https://img.shields.io/badge/Framework-Foundry-D64023?style=flat-square)
-![License](https://img.shields.io/badge/License-MIT-blue?style=flat-square)
+**A time-weighted Ethereum staking protocol that rewards long-term conviction, not short-term capital.**
 
-![Coverage](https://codecov.io/gh/https:/Rafiitarse/time-weighted-staking-vault/branch/main/graph/badge.svg)
+Built with Solidity and Foundry, the vault tracks every deposit as an individually-aged position (`DepositLot`) and scales yield multipliers based on precisely how long that position has been held — from 0% before 6 months up to 40% at 3+ years.
 
-**Author:** **Lintar Ar' Rafii**
-```
-```
+[![Solidity](https://img.shields.io/badge/Solidity-0.8.27-363636?style=flat-square&logo=solidity)](https://soliditylang.org/)
+[![Framework](https://img.shields.io/badge/Framework-Foundry-D64023?style=flat-square)](https://getfoundry.sh/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](./LICENSE)
+[![Coverage](https://codecov.io/gh/Rafiitarse/time-weighted-staking-vault/branch/main/graph/badge.svg)](https://codecov.io/gh/Rafiitarse/time-weighted-staking-vault)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/Rafiitarse/time-weighted-staking-vault/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/Rafiitarse/time-weighted-staking-vault/actions)
+
+**Author:** [Lintar Ar' Rafii](https://github.com/Rafiitarse)
+
+</div>
+
+---
+
 ## 🧭 Quick Navigation
-- [Core Smart Contracts](./README.md)
-- [Frontend dApp Integration](./frontend/README.md)
-- [Subgraph & Data Indexing](./subgraph/README.md)
+
+| Package | Description | Status |
+|---|---|---|
+| [`contracts/`](#-smart-contracts) | Core Solidity contracts, tests, and deployment scripts | 🟢 Active |
+| [`subgraph/`](./subgraph/README.md) | The Graph indexer for on-chain events and analytics | 🟢 Active |
+| [`frontend/`](./frontend/README.md) | Web3 dApp for depositing, tracking, and withdrawing | 🟢 Active |
+
+---
+
+## Table of Contents
+
+- [Overview](#-overview)
+- [Problems Solved](#-problems-solved)
+- [Key Features](#-key-features)
+- [Monorepo Architecture](#️-monorepo-architecture)
+- [Smart Contracts](#-smart-contracts)
+- [Reward Multiplier Tiers](#-reward-multiplier-tiers)
+- [Getting Started](#️-getting-started)
+- [Testing & Coverage](#-testing--coverage)
+- [Deployment](#-deployment)
+- [Security](#-security)
+- [Roadmap](#-roadmap)
+- [Contributing](#-contributing)
+- [License](#-license)
+- [Author & Contact](#-author--contact)
 
 ---
 
 ## 📖 Overview
 
-Traditional staking protocols often aggregate user deposits into a single pool, averaging out deposit times and making it difficult to reward long-term stakers fairly. 
+Traditional staking protocols pool user deposits together, averaging out deposit times. This makes it structurally impossible to reward long-term stakers fairly — a deposit made yesterday earns the same yield as one held for three years.
 
-The **Time-Weighted Staking Vault** solves this by implementing a **Lot-Based Staking System**. Every time a user deposits ETH, a dedicated `DepositLot` is created, recording the exact amount and timestamp. Upon withdrawal, the protocol calculates the precise maturity of that lot and mints **Reward Tokens (RWD)** based on a time-weighted yield multiplier.
+The **Time-Weighted Staking Vault** solves this with a **lot-based staking model**. Every deposit creates a dedicated `DepositLot`, recording its exact amount and timestamp on-chain. On withdrawal, the protocol computes that specific lot's maturity and mints **Reward Tokens (`RWD`)** according to a time-weighted yield multiplier — entirely independent of any other lot the user owns.
 
-To represent the staked position, the vault issues **Staked ETH Receipts (stETH)**. These receipt tokens act similarly to Soulbound Tokens (SBTs) with non-transferable mechanics, ensuring positions cannot be traded on secondary markets to farm rewards or dilute protocol yield.
+To represent an open position, the vault issues **Staked ETH Receipts (`stETH`)**. These receipts are intentionally non-transferable (soulbound-style), so positions cannot be traded on secondary markets to farm yield or dilute protocol rewards.
 
 ---
 
 ## 🎯 Problems Solved
 
-1. **The "Time-Dilution" Problem:**
-   - *Problem:* In standard staking vaults, depositing additional funds resets or dilutes the time-weight of a user's original stake.
-   - *Solution:* **Lot-Based Tracking**. By isolating each deposit into a unique `DepositLot`, users can continuously add to their position without resetting the age of older deposits.
-
-2. **Secondary Market Dumping & Depegging:**
-   - *Problem:* Liquid staking receipts are often traded or dumped on DEXs, causing depegging and yield farming exploits.
-   - *Solution:* **Restricted Transferability (SBT Behavior)**. `stETH` minting and burning are strictly locked to the Vault. Transfers are blocked to preserve a 1:1 backing with locked ETH.
-
-3. **Yield Exploitation (Mercenary Capital):**
-   - *Problem:* Flash-loans or short-term staking used to capture quick yield rewards.
-   - *Solution:* **Tiered Maturity**. Rewards require a minimum 183-day holding period, aligning incentives with long-term protocol supporters.
+| # | Problem | Solution |
+|---|---|---|
+| 1 | **Time dilution** — depositing additional funds resets or averages down the age of a user's original stake. | **Lot-based tracking.** Each deposit is isolated into its own `DepositLot`, so adding to a position never resets the maturity of earlier deposits. |
+| 2 | **Secondary-market depegging** — liquid staking receipts get traded or dumped on DEXs, causing depegs and yield-farming exploits. | **Restricted transferability.** `stETH` minting/burning is locked to the vault contract; transfers are blocked, preserving a strict 1:1 backing with locked ETH. |
+| 3 | **Mercenary capital** — flash loans or short-term stakes used to capture rewards without genuine commitment. | **Tiered maturity.** Rewards only begin accruing after a minimum 183-day holding period, aligning incentives with long-term supporters. |
 
 ---
 
 ## ✨ Key Features
 
-- **Individual Deposit Lots:** Records `amount` (`uint128`) and `timestamp` (`uint64`) per deposit for efficient storage gas optimization.
-- **Time-Weighted Yield:** Dynamic yield multipliers scaling from 15% (6 months) up to 40% (3+ years).
-- **Soulbound Receipts (`stETH`):** Locked receipt tokens to guarantee strict accounting integrity.
-- **Partial Withdrawals:** Withdraw fractions of a specific lot without altering the maturity timestamp of the remaining stake.
-- **Enterprise-Grade Security:** Built with OpenZeppelin's `ReentrancyGuard`, `Pausable`, and `Ownable`.
+- **Individual Deposit Lots** — each lot packs `amount` (`uint128`) and `timestamp` (`uint64`) for gas-efficient storage.
+- **Time-Weighted Yield** — reward multipliers scale from **15%** at 6 months up to **40%** at 3+ years.
+- **Soulbound Receipts (`stETH`)** — non-transferable receipt tokens guarantee strict 1:1 accounting integrity.
+- **Partial Withdrawals** — withdraw a fraction of a lot without disturbing the maturity timestamp of the remaining balance.
+- **Full On-Chain Indexing** — every deposit, withdrawal, and reward event is queryable via the companion [subgraph](./subgraph/README.md).
+- **Enterprise-Grade Security** — built on OpenZeppelin's `ReentrancyGuard`, `Pausable`, and `Ownable`.
 
 ---
 
-## 🏗️ Architecture & Monorepo Structure
+## 🏗️ Monorepo Architecture
 
-This project is organized as a **Monorepo** keeping the core smart contracts, off-chain indexing services, and frontend applications synced.
+This project is organized as a monorepo, keeping the core smart contracts, off-chain indexing service, and frontend application in sync under a single source of truth.
 
 ```text
 .
-├── contracts/        # Foundry-based Smart Contracts & Test Suite (🟢 Active)
-├── subgraph/         # The Graph Indexer for on-chain events (🚧 Coming Soon)
-└── frontend/         # Web3 Web Application UI (🚧 Coming Soon)
-
+├── README.md
+├── contracts
+│   ├── broadcast
+│   │   └── DeployStakingVault.s.sol
+│   ├── foundry.lock
+│   ├── foundry.toml
+│   ├── lcov.info
+│   ├── lib
+│   │   ├── forge-std
+│   │   └── openzeppelin-contracts
+│   ├── remappings.txt
+│   ├── script
+│   │   └── DeployStakingVault.s.sol
+│   ├── src
+│   │   ├── ReceiptToken.sol
+│   │   ├── RewardToken.sol
+│   │   └── StakingVault.sol
+│   └── test
+│       └── VaultTest.t.sol
+├── frontend
+│   ├── AGENTS.md
+│   ├── CLAUDE.md
+│   ├── README.md
+│   ├── app
+│   │   ├── favicon.ico
+│   │   ├── globals.css
+│   │   ├── layout.tsx
+│   │   └── page.tsx
+│   ├── components
+│   │   ├── Analytics.tsx
+│   │   ├── Analytics.tsx:Zone.Identifier
+│   │   ├── DepositCard.tsx
+│   │   ├── DepositCard.tsx:Zone.Identifier
+│   │   ├── Navbar.tsx
+│   │   ├── Navbar.tsx:Zone.Identifier
+│   │   ├── UserLotsList.tsx
+│   │   ├── UserLotsList.tsx:Zone.Identifier
+│   │   ├── contract.ts:Zone.Identifier
+│   │   ├── providers.tsx:Zone.Identifier
+│   │   ├── toast.tsx:Zone.Identifier
+│   │   └── utils.ts:Zone.Identifier
+│   ├── eslint.config.mjs
+│   ├── lib
+│   │   ├── contract.ts
+│   │   ├── providers.tsx
+│   │   ├── toast.tsx
+│   │   └── utils.ts
+│   ├── next-env.d.ts
+│   ├── next.config.ts
+│   ├── package-lock.json
+│   ├── package.json
+│   ├── postcss.config.mjs
+│   ├── public
+│   │   ├── file.svg
+│   │   ├── globe.svg
+│   │   ├── next.svg
+│   │   ├── vercel.svg
+│   │   └── window.svg
+│   └── tsconfig.json
+└── subgraph
+    ├── README.md
+    └── staking-vault
+        ├── abis
+        ├── build
+        ├── docker-compose.yml
+        ├── generated
+        ├── networks.json
+        ├── package-lock.json
+        ├── package.json
+        ├── schema.graphql
+        ├── src
+        ├── subgraph.yaml
+        ├── tests
+        └── tsconfig.json
 ```
 
-### 📜 Smart Contracts Breakdown
+**Data flow at a glance:**
 
-1. **`StakingVault.sol` (Core Engine)**
-* Handles ETH deposits, partial/full withdrawals, and lot accounting.
-* Calculates age-based reward multipliers and orchestrates token minting/burning.
+```
+User ──▶ StakingVault.sol ──emits events──▶ subgraph (The Graph) ──▶ GraphQL API ──▶ frontend
+```
 
+See the [subgraph README](./subgraph/README.md) for the full entity schema (`User`, `DepositLot`, `LotWithdrawal`, `ProtocolStat`) and example queries.
 
-2. **`ReceiptToken.sol` (`stETH`)**
-* Non-transferable ERC-20 receipt token representing staked ETH positions.
+---
 
+## 📜 Smart Contracts
 
-3. **`RewardToken.sol` (`RWD`)**
-* ERC-20 reward token minted directly to users upon qualifying withdrawals.
-
-
+| Contract | Role | Summary |
+|---|---|---|
+| **`StakingVault.sol`** | Core engine | Handles ETH deposits, partial/full withdrawals, and lot accounting. Calculates age-based reward multipliers and orchestrates token minting/burning. |
+| **`ReceiptToken.sol`** (`stETH`) | Position receipt | Non-transferable ERC-20 representing a staked ETH position. Mint/burn restricted to the vault. |
+| **`RewardToken.sol`** (`RWD`) | Yield token | Standard ERC-20 minted directly to users on qualifying withdrawals. |
 
 ---
 
 ## 📊 Reward Multiplier Tiers
 
-Rewards are calculated based on the precise holding duration of the withdrawn lot:
+Rewards are calculated based on the precise holding duration of the specific lot being withdrawn from — **not** the user's account age.
 
-| Holding Period | Age (Days) | Multiplier (in thousandths) | Reward Yield |
-| --- | --- | --- | --- |
-| < 6 Months | 0 - 182 | 0 | 0% |
-| 6 Months | 183 - 365 | 150 | 15% |
-| 1 Year | 366 - 548 | 200 | 20% |
-| 1.5 Years | 549 - 731 | 250 | 25% |
-| 2 Years | 732 - 914 | 300 | 30% |
-| 2.5 Years | 915 - 1097 | 350 | 35% |
-| 3+ Years | 1098+ | 400 | 40% |
+| Holding Period | Age (Days) | Multiplier (‰) | Effective Yield |
+|---|---|---|---|
+| < 6 months | 0 – 182 | 0 | 0% |
+| 6 months | 183 – 365 | 150 | 15% |
+| 1 year | 366 – 548 | 200 | 20% |
+| 1.5 years | 549 – 731 | 250 | 25% |
+| 2 years | 732 – 914 | 300 | 30% |
+| 2.5 years | 915 – 1,097 | 350 | 35% |
+| 3+ years | 1,098+ | 400 | 40% |
 
-*Formula:* `Total Reward = (Withdrawn Amount * Multiplier) / 1000`
+**Formula:**
+
+```
+Total Reward = (Withdrawn Amount × Multiplier) / 1000
+```
 
 ---
 
@@ -108,66 +206,66 @@ Rewards are calculated based on the precise holding duration of the withdrawn lo
 
 ### Prerequisites
 
-Ensure you have [Foundry](https://getfoundry.sh/) installed:
+- [Foundry](https://getfoundry.sh/) (Forge, Cast, Anvil)
+- [Git](https://git-scm.com/)
+- Node.js ≥ 18 (required for the [`subgraph/`](./subgraph/README.md) and `frontend/` packages)
+
+Install Foundry:
 
 ```bash
-curl -L [https://foundry.paradigm.xyz](https://foundry.paradigm.xyz) | bash
+curl -L https://foundry.paradigm.xyz | bash
 foundryup
-
 ```
 
-### Installation & Compilation
+### Installation
 
-1. **Create New Project**
 ```bash
-forge init your-name-project
-cd your-name-project
-```
-
-2. **Clone the repository:**
-```bash
+# 1. Clone the repository
 git clone https://github.com/Rafiitarse/time-weighted-staking-vault.git
+cd time-weighted-staking-vault/contracts
 
-```
-3. **Install dependencies:**
-```bash
+# 2. Install dependencies
 forge install OpenZeppelin/openzeppelin-contracts --no-commit
 
-```
-4. **Remappings Libs**
-```bash
+# 3. Generate remappings
 forge remappings > remappings.txt
 
-```
-
-5. **Compile contracts:**
-```bash
+# 4. Compile contracts
 forge build
-
 ```
 
+---
 
-
-### Testing & Coverage
-
-Run the unit and integration test suites:
+## 🧪 Testing & Coverage
 
 ```bash
-# Run all tests
+# Run the full test suite
 forge test
 
-# Run tests with detailed traces & gas reports
+# Run with detailed call traces and gas reports
 forge test -vvv --gas-report
 
-# Generate test coverage report
+# Generate a coverage report
 forge coverage
-
 ```
 
-### Deployment
+Coverage results are automatically published to [Codecov](https://codecov.io/gh/Rafiitarse/time-weighted-staking-vault) on every push to `main`.
 
-Deploy contracts to a local Anvil instance or testnet using Foundry scripts:
-(Ensure you are in the project root directory.)
+---
+
+## 🚢 Deployment
+
+Deploy to a local Anvil instance or a live testnet using the Foundry deployment script. Run this from the repository root, or use `--root contracts` as shown below.
+
+1. Create a `.env` file inside `contracts/` with the following variables:
+
+```bash
+SEPOLIA_RPC_URL=
+PRIVATE_KEY=
+ETHERSCAN_API_KEY=
+```
+
+2. Run the deployment script:
 
 ```bash
 forge script contracts/script/DeployStakingVault.s.sol:DeployStakingVault \
@@ -178,11 +276,51 @@ forge script contracts/script/DeployStakingVault.s.sol:DeployStakingVault \
   --verify \
   --etherscan-api-key $ETHERSCAN_API_KEY \
   -vvvv
-
 ```
+
+Once deployed, update the contract `address` and `startBlock` in [`subgraph/subgraph.yaml`](./subgraph/subgraph.yaml) and redeploy the subgraph — see the [subgraph README](./subgraph/README.md#build--deployment) for details.
 
 ---
 
+## 🔒 Security
+
+- Built on audited [OpenZeppelin](https://www.openzeppelin.com/contracts) primitives (`ReentrancyGuard`, `Pausable`, `Ownable`).
+- `stETH` transfers are hard-blocked at the token level to prevent secondary-market exploits.
+- `pause()` / `unpause()` allow the owner to halt deposits and withdrawals in an emergency.
+- This codebase has **not yet undergone a formal third-party audit**. Use on mainnet at your own risk until an audit report is published here.
+
+If you discover a security vulnerability, please **do not** open a public issue — report it privately to the author (see [Contact](#-author--contact)).
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome. To propose a change:
+
+1. Fork the repository and create a feature branch.
+2. Make your changes, following the existing code style.
+3. Add or update tests to cover your change (`forge coverage` should not regress).
+4. Open a pull request describing the change and its motivation.
+
+Please open an issue first for significant changes so they can be discussed before implementation.
+
+---
+
+## 📄 License
+
+This project is licensed under the **MIT License** — see [`LICENSE`](./LICENSE) for details.
+
+---
+
+## 👤 Author & Contact
+
+**Lintar Ar' Rafii**
+
+- GitHub: [@Rafiitarse](https://github.com/Rafiitarse)
+- Repository: [time-weighted-staking-vault](https://github.com/Rafiitarse/time-weighted-staking-vault)
+
+<div align="center">
+
 *Built with precision for the future of decentralized finance.*
 
-```
+</div>
