@@ -11,7 +11,7 @@ jobs:
         uses: foundry-rs/foundry-toolchain@v1
         
       - name: Run Coverage
-        run: forge coverage --report lcov
+        run: forge coverage --no-match-coverage "^(test|script)/" --report lcov
         working-directory: ./contracts
         
       - name: Upload to Codecov
@@ -22,7 +22,7 @@ jobs:
       - name: Upload to Codecov
         uses: codecov/codecov-action@v4
         with:
-          files: contracts/lcov.info
+          files: ./contracts/lcov.info
           fail_ci_if_error: false
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
