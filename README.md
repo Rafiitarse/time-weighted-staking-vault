@@ -318,6 +318,8 @@ This project is licensed under the **MIT License** — see [`LICENSE`](./LICENSE
 
 - GitHub: [@Rafiitarse](https://github.com/Rafiitarse)
 - Repository: [time-weighted-staking-vault](https://github.com/Rafiitarse/time-weighted-staking-vault)
+- Linkedln: [Lintararrafii](https://www.linkedin.com/in/lintararrafii22)
+- X: [@Arrafiilintar](https://x.com/@Arrafiilintar)
 
 <div align="center">
 
