@@ -250,4 +250,148 @@ contract StakingVaultMegaTest is Test {
 
         vm.stopPrank();
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 1. BEHAVIOR: partial withdrawal must NOT reset the lot's original timestamp
+    //    This is the core selling point of the whole protocol (README explicitly
+    //    promises it) but nothing in the current suite verifies it.
+    // ─────────────────────────────────────────────────────────────────────────
+    function test_Behavior_PartialWithdraw_PreservesTimestamp() public {
+        vm.startPrank(user1);
+        vault.deposit{value: 10 ether}();
+
+        StakingVault.DepositLot[] memory lotsBefore = vault.getUserLots(user1);
+        uint64 originalTimestamp = lotsBefore[0].timestamp;
+
+        // Move forward, then withdraw only part of the lot.
+        vm.warp(block.timestamp + 100 days);
+        vault.withdrawFromLot(0, 4 ether);
+
+        StakingVault.DepositLot[] memory lotsAfter = vault.getUserLots(user1);
+        assertEq(
+            lotsAfter[0].timestamp,
+            originalTimestamp,
+            "partial withdrawal must not reset the lot's maturity timestamp"
+        );
+        assertEq(lotsAfter[0].amount, 6 ether, "remaining amount should decrease by the withdrawn portion");
+
+        // A second partial withdrawal, further in the future, must still use the
+        // ORIGINAL timestamp for its multiplier -- not the time of this withdrawal.
+        vm.warp(block.timestamp + 100 days); // lot is now 200 days old in total
+        vault.withdrawFromLot(0, 6 ether);
+        assertEq(reward.balanceOf(user1), 0.9 ether, "second withdrawal should use the lot's original age, not a reset one");
+        vm.stopPrank();
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 2. BOUNDARY: every tier threshold, tested one second below and exactly at.
+    //    The existing all-tiers test jumps in 183-day increments and would never
+    //    catch an off-by-one in `_calculateLotMultiplier` (e.g. `>` vs `>=`).
+    // ─────────────────────────────────────────────────────────────────────────
+    function _assertMultiplierAtAge(uint256 ageInSeconds, uint256 expectedMultiplierBP) internal {
+        // Fresh probe address per check so each boundary is fully isolated.
+        address probe = address(uint160(uint256(keccak256(abi.encodePacked(ageInSeconds, expectedMultiplierBP)))));
+        vm.deal(probe, 10 ether);
+
+        vm.startPrank(probe);
+        vault.deposit{value: 10 ether}();
+        vm.warp(block.timestamp + ageInSeconds);
+        vault.withdrawFromLot(0, 10 ether);
+
+        uint256 expectedReward = (10 ether * expectedMultiplierBP) / 1000;
+        assertEq(reward.balanceOf(probe), expectedReward, "unexpected reward at this age boundary");
+        vm.stopPrank();
+    }
+
+    function test_Boundary_AllTierThresholds() public {
+        _assertMultiplierAtAge(183 days - 1, 0);    // one second before 6mo -> still 0%
+        _assertMultiplierAtAge(183 days,     150);  // exactly 6mo -> 15%
+        _assertMultiplierAtAge(366 days - 1, 150);  // one second before 1yr -> still 15%
+        _assertMultiplierAtAge(366 days,     200);  // exactly 1yr -> 20%
+        _assertMultiplierAtAge(549 days - 1, 200);
+        _assertMultiplierAtAge(549 days,     250);
+        _assertMultiplierAtAge(732 days - 1, 250);
+        _assertMultiplierAtAge(732 days,     300);
+        _assertMultiplierAtAge(915 days - 1, 300);
+        _assertMultiplierAtAge(915 days,     350);
+        _assertMultiplierAtAge(1098 days - 1, 350);
+        _assertMultiplierAtAge(1098 days,     400); // exactly 3yr -> max 40%
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 3. FUZZ: deposit accounting holds for any (realistic) amount.
+    //    Bounded to uint96 -- far beyond total ETH supply, but keeps `vm.deal`
+    //    fast and avoids the (practically unreachable) uint128 truncation edge
+    //    in `deposit()`, which is worth knowing about even if not fuzzed here:
+    //    `uint128(msg.value)` silently truncates rather than reverting if
+    //    msg.value > type(uint128).max. Not exploitable given ETH's total
+    //    supply, but an auditor will ask if you know about it -- now you do.
+    // ─────────────────────────────────────────────────────────────────────────
+    function testFuzz_Deposit_LotRecordsExactAmount(uint96 amount) public {
+        vm.assume(amount > 0);
+        vm.deal(user1, amount);
+
+        vm.startPrank(user1);
+        vault.deposit{value: amount}();
+
+        StakingVault.DepositLot[] memory lots = vault.getUserLots(user1);
+        assertEq(lots.length, 1);
+        assertEq(lots[0].amount, amount, "stored lot amount must exactly match msg.value");
+        assertEq(receipt.balanceOf(user1), amount, "receipt tokens must be minted 1:1");
+        vm.stopPrank();
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 4. FUZZ: withdrawal accounting -- covers the zero-amount revert, the
+    //    over-withdraw revert, and the success path, all from one fuzzed pair.
+    // ─────────────────────────────────────────────────────────────────────────
+    function testFuzz_WithdrawFromLot_ConservesAccounting(uint96 depositAmount, uint96 withdrawAmount) public {
+        vm.assume(depositAmount > 0);
+        vm.deal(user1, depositAmount);
+
+        vm.startPrank(user1);
+        vault.deposit{value: depositAmount}();
+
+        if (withdrawAmount == 0) {
+            vm.expectRevert(StakingVault.ZeroAmount.selector);
+            vault.withdrawFromLot(0, withdrawAmount);
+        } else if (withdrawAmount > depositAmount) {
+            vm.expectRevert(StakingVault.InsufficientLotAmount.selector);
+            vault.withdrawFromLot(0, withdrawAmount);
+        } else {
+            uint256 ethBefore = user1.balance;
+            uint256 receiptBefore = receipt.balanceOf(user1);
+
+            vault.withdrawFromLot(0, withdrawAmount);
+
+            assertEq(user1.balance, ethBefore + withdrawAmount, "ETH payout must equal the withdrawn amount");
+            assertEq(receipt.balanceOf(user1), receiptBefore - withdrawAmount, "receipt tokens must burn 1:1");
+
+            StakingVault.DepositLot[] memory lots = vault.getUserLots(user1);
+            assertEq(lots[0].amount, depositAmount - withdrawAmount, "remaining lot amount must be exact");
+        }
+        vm.stopPrank();
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 5. MULTI-LOT: withdrawing from one lot must never affect a sibling lot.
+    //    Every existing test only ever touches a single lot per user.
+    // ─────────────────────────────────────────────────────────────────────────
+    function test_MultiLot_WithdrawalsAreIsolated() public {
+        vm.startPrank(user1);
+        vault.deposit{value: 5 ether}();  // lot 0
+        vm.warp(block.timestamp + 200 days);
+        vault.deposit{value: 3 ether}();  // lot 1, younger, different multiplier tier
+
+        // Withdraw fully from lot 1 (young, 0% reward) -- lot 0 must be untouched.
+        vault.withdrawFromLot(1, 3 ether);
+
+        StakingVault.DepositLot[] memory lots = vault.getUserLots(user1);
+        assertEq(lots[0].amount, 5 ether, "lot 0 amount must be unaffected by lot 1 withdrawal");
+        assertEq(lots[1].amount, 0, "lot 1 should be fully withdrawn");
+        assertEq(reward.balanceOf(user1), 0, "lot 1 was too young to earn any reward");
+        vm.stopPrank();
+    }
+
+
 }
