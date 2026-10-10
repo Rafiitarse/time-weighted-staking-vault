@@ -10,7 +10,7 @@ Built with Solidity and Foundry, the vault tracks every deposit as an individual
 [![Framework](https://img.shields.io/badge/Framework-Foundry-D64023?style=flat-square)](https://getfoundry.sh/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](./LICENSE)
 [![Coverage](https://codecov.io/gh/Rafiitarse/time-weighted-staking-vault/branch/main/graph/badge.svg)](https://codecov.io/gh/Rafiitarse/time-weighted-staking-vault)
-[![Build Status](https://img.shields.io/github/actions/workflow/status/Rafiitarse/time-weighted-staking-vault/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/Rafiitarse/time-weighted-staking-vault/actions)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/Rafiitarse/time-weighted-staking-vault/ci-cd.yml?branch=main&style=flat-square&label=CI)](https://github.com/Rafiitarse/time-weighted-staking-vault/actions)
 
 **Author:** [Lintar Ar' Rafii](https://github.com/Rafiitarse)
 
@@ -74,7 +74,7 @@ To represent an open position, the vault issues **Staked ETH Receipts (`stETH`)*
 - **Soulbound Receipts (`stETH`)** — non-transferable receipt tokens guarantee strict 1:1 accounting integrity.
 - **Partial Withdrawals** — withdraw a fraction of a lot without disturbing the maturity timestamp of the remaining balance.
 - **Full On-Chain Indexing** — every deposit, withdrawal, and reward event is queryable via the companion [subgraph](./subgraph/README.md).
-- **Enterprise-Grade Security** — built on OpenZeppelin's `ReentrancyGuard`, `Pausable`, and `Ownable`.
+- **Security-Focused Design** — built on OpenZeppelin's `ReentrancyGuard`, `Pausable`, and `Ownable`.
 
 ---
 
@@ -90,10 +90,9 @@ This project is organized as a monorepo, keeping the core smart contracts, off-c
 │   │   └── DeployStakingVault.s.sol
 │   ├── foundry.lock
 │   ├── foundry.toml
-│   ├── lcov.info
 │   ├── lib
-│   │   ├── forge-std
-│   │   └── openzeppelin-contracts
+│   │   ├── forge-std              # git submodule
+│   │   └── openzeppelin-contracts # git submodule
 │   ├── remappings.txt
 │   ├── script
 │   │   └── DeployStakingVault.s.sol
@@ -114,42 +113,25 @@ This project is organized as a monorepo, keeping the core smart contracts, off-c
 │   │   └── page.tsx
 │   ├── components
 │   │   ├── Analytics.tsx
-│   │   ├── Analytics.tsx:Zone.Identifier
 │   │   ├── DepositCard.tsx
-│   │   ├── DepositCard.tsx:Zone.Identifier
 │   │   ├── Navbar.tsx
-│   │   ├── Navbar.tsx:Zone.Identifier
-│   │   ├── UserLotsList.tsx
-│   │   ├── UserLotsList.tsx:Zone.Identifier
-│   │   ├── contract.ts:Zone.Identifier
-│   │   ├── providers.tsx:Zone.Identifier
-│   │   ├── toast.tsx:Zone.Identifier
-│   │   └── utils.ts:Zone.Identifier
+│   │   └── UserLotsList.tsx
 │   ├── eslint.config.mjs
 │   ├── lib
 │   │   ├── contract.ts
 │   │   ├── providers.tsx
 │   │   ├── toast.tsx
 │   │   └── utils.ts
-│   ├── next-env.d.ts
 │   ├── next.config.ts
 │   ├── package-lock.json
 │   ├── package.json
 │   ├── postcss.config.mjs
-│   ├── public
-│   │   ├── file.svg
-│   │   ├── globe.svg
-│   │   ├── next.svg
-│   │   ├── vercel.svg
-│   │   └── window.svg
 │   └── tsconfig.json
 └── subgraph
     ├── README.md
     └── staking-vault
         ├── abis
-        ├── build
         ├── docker-compose.yml
-        ├── generated
         ├── networks.json
         ├── package-lock.json
         ├── package.json
@@ -221,16 +203,13 @@ foundryup
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/Rafiitarse/time-weighted-staking-vault.git
+git clone --recurse-submodules https://github.com/Rafiitarse/time-weighted-staking-vault.git
 cd time-weighted-staking-vault/contracts
 
-# 2. Install dependencies
-forge install OpenZeppelin/openzeppelin-contracts --no-commit
+# (If you already cloned without --recurse-submodules)
+# git submodule update --init --recursive
 
-# 3. Generate remappings
-forge remappings > remappings.txt
-
-# 4. Compile contracts
+# 2. Compile contracts
 forge build
 ```
 
@@ -255,9 +234,9 @@ Coverage results are automatically published to [Codecov](https://codecov.io/gh/
 
 ## 🚢 Deployment
 
-Deploy to a local Anvil instance or a live testnet using the Foundry deployment script. Run this from the repository root, or use `--root contracts` as shown below.
+Deploy to a local Anvil instance or a live testnet using the Foundry deployment script.
 
-1. Create a `.env` file inside `contracts/` with the following variables:
+1. Create a `.env` file inside `contracts/` with the following variables (this file is git-ignored — never commit it):
 
 ```bash
 SEPOLIA_RPC_URL=
@@ -265,20 +244,21 @@ PRIVATE_KEY=
 ETHERSCAN_API_KEY=
 ```
 
-2. Run the deployment script:
+2. Run the deployment script from the `contracts/` directory. The script reads `PRIVATE_KEY` from the environment, so the key never has to appear on the command line or in your shell history:
 
 ```bash
-forge script contracts/script/DeployStakingVault.s.sol:DeployStakingVault \
-  --root contracts \
+cd contracts
+source .env
+
+forge script script/DeployStakingVault.s.sol:DeployVaultScript \
   --rpc-url $SEPOLIA_RPC_URL \
-  --private-key $PRIVATE_KEY \
   --broadcast \
   --verify \
   --etherscan-api-key $ETHERSCAN_API_KEY \
   -vvvv
 ```
 
-Once deployed, update the contract `address` and `startBlock` in [`subgraph/subgraph.yaml`](./subgraph/subgraph.yaml) and redeploy the subgraph — see the [subgraph README](./subgraph/README.md#build--deployment) for details.
+Once deployed, update the contract `address` and `startBlock` in [`subgraph/staking-vault/subgraph.yaml`](./subgraph/staking-vault/subgraph.yaml) and redeploy the subgraph — see the [subgraph README](./subgraph/README.md#build--deployment) for details.
 
 ---
 
@@ -318,7 +298,7 @@ This project is licensed under the **MIT License** — see [`LICENSE`](./LICENSE
 
 - GitHub: [@Rafiitarse](https://github.com/Rafiitarse)
 - Repository: [time-weighted-staking-vault](https://github.com/Rafiitarse/time-weighted-staking-vault)
-- Linkedln: [Lintararrafii](https://www.linkedin.com/in/lintararrafii22)
+- LinkedIn: [Lintararrafii](https://www.linkedin.com/in/lintararrafii22)
 - X: [@Arrafiilintar](https://x.com/@Arrafiilintar)
 
 <div align="center">
