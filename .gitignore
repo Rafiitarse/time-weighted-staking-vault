@@ -1,26 +1,27 @@
+# Secrets
 .env
 .env.*
 !.env.example
 
-
+# Foundry
 contracts/cache/
 contracts/out/
 contracts/.logs/
-
-
-!contracts/broadcast
+lcov.info
 contracts/broadcast/*/31337/
 contracts/broadcast/**/dry-run/
 
+# Subgraph (Graph CLI output)
+subgraph/staking-vault/build/
+subgraph/staking-vault/generated/
 
-subgraph/generated/
-subgraph/build/
-frontend/node_modules/
-frontend/.next/
+# Node / frontend
 node_modules/
+frontend/.next/
 
-
+# OS / editor junk
 .DS_Store
 Thumbs.db
+*:Zone.Identifier
 .vscode/
 .idea/
