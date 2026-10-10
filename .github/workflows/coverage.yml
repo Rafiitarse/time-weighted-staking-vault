@@ -1,23 +1,21 @@
 name: Foundry Coverage
+
 on: [push, pull_request]
 
 jobs:
   coverage:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
-        
+
       - name: Run Coverage
         run: forge coverage --no-match-coverage "^(test|script)/" --report lcov
         working-directory: ./contracts
-        
-      - name: Upload to Codecov
-        uses: codecov/codecov-action@v3
-        with:
-          files: ./contracts/lcov.info
 
       - name: Upload to Codecov
         uses: codecov/codecov-action@v4

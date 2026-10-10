@@ -2,7 +2,6 @@
 src = "src"
 out = "out"
 libs = ["lib"]
-coverage_omit = ["script/**/*", "test/**/*"]
 solc_version = "0.8.27"
 no_match_coverage = "(test|script)"
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
