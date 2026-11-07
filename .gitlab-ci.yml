@@ -1,0 +1,128 @@
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && ($CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "master")'
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"'
+    - when: never
+
+stages:
+  - test
+  - deploy
+
+variables:
+  GIT_SUBMODULE_STRATEGY: recursive
+  GIT_DEPTH: "0"
+
+frontend-ci:
+  stage: test
+  image: node:20
+  cache:
+    key:
+      files:
+        - frontend/package-lock.json
+    paths:
+      - .npm/
+  script:
+    - cd frontend
+    - npm ci --legacy-peer-deps --cache "$CI_PROJECT_DIR/.npm" --prefer-offline
+    - npm run build
+
+contracts-ci:
+  stage: test
+  image:
+    name: ghcr.io/foundry-rs/foundry:latest
+    entrypoint: [""]
+  script:
+    - cd contracts
+    - forge build --sizes
+    - forge test -vvv
+
+coverage:
+  stage: test
+  image:
+    name: ghcr.io/foundry-rs/foundry:latest
+    entrypoint: [""]
+  script:
+    - cd contracts
+    - forge coverage --no-match-coverage "^(test|script)/" --report lcov
+    - cd ..
+    - |
+      if [ -n "${CODECOV_TOKEN:-}" ]; then
+        if curl --fail --location --silent --show-error \
+          https://cli.codecov.io/latest/linux/codecov --output ./codecov; then
+          chmod +x ./codecov
+          if ./codecov create-commit --sha "$CI_COMMIT_SHA" \
+            --branch "$CI_COMMIT_REF_NAME" --git-service gitlab \
+            --token "$CODECOV_TOKEN" \
+            && ./codecov create-report --sha "$CI_COMMIT_SHA" \
+              --git-service gitlab --token "$CODECOV_TOKEN" \
+            && ./codecov do-upload --sha "$CI_COMMIT_SHA" \
+              --git-service gitlab --file contracts/lcov.info \
+              --token "$CODECOV_TOKEN"; then
+            echo "Coverage uploaded to Codecov."
+          else
+            echo "WARNING: Codecov upload failed; coverage job remains non-blocking." >&2
+          fi
+        else
+          echo "WARNING: Could not download the Codecov CLI; coverage job remains non-blocking." >&2
+        fi
+      else
+        echo "CODECOV_TOKEN is not configured; skipping the optional Codecov upload."
+      fi
+
+subgraph-ci:
+  stage: test
+  image: node:20
+  cache:
+    key:
+      files:
+        - subgraph/staking-vault/package-lock.json
+    paths:
+      - .npm/
+  script:
+    - cd subgraph/staking-vault
+    - npm ci --cache "$CI_PROJECT_DIR/.npm" --prefer-offline
+    - npm run codegen
+    - npm run build
+
+contracts-deploy:
+  stage: deploy
+  image:
+    name: ghcr.io/foundry-rs/foundry:latest
+    entrypoint: [""]
+  needs:
+    - contracts-ci
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "web" && ($CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master")'
+      when: manual
+      allow_failure: false
+    - when: never
+  script:
+    - cd contracts
+    - ': "${SEPOLIA_RPC_URL:?Configure the SEPOLIA_RPC_URL GitLab CI/CD variable}"'
+    - ': "${PRIVATE_KEY:?Configure the PRIVATE_KEY GitLab CI/CD variable}"'
+    - ': "${ETHERSCAN_API_KEY:?Configure the ETHERSCAN_API_KEY GitLab CI/CD variable}"'
+    - |
+      forge script script/DeployStakingVault.s.sol:DeployVaultScript \
+        --rpc-url "$SEPOLIA_RPC_URL" \
+        --broadcast \
+        --verify \
+        -vvvv
+
+subgraph-deploy:
+  stage: deploy
+  image: node:20
+  needs:
+    - subgraph-ci
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "web" && ($CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master")'
+      when: manual
+      allow_failure: false
+    - when: never
+  script:
+    - cd subgraph/staking-vault
+    - npm ci
+    - npm run codegen
+    - ': "${GRAPH_DEPLOY_KEY:?Configure the GRAPH_DEPLOY_KEY GitLab CI/CD variable}"'
+    - ': "${SUBGRAPH_SLUG:?Configure the SUBGRAPH_SLUG GitLab CI/CD variable}"'
+    - npx graph auth --studio "$GRAPH_DEPLOY_KEY"
+    - npx graph deploy --studio "$SUBGRAPH_SLUG" --version-label v0.0.1

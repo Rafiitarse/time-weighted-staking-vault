@@ -260,6 +260,19 @@ forge script script/DeployStakingVault.s.sol:DeployVaultScript \
 
 Once deployed, update the contract `address` and `startBlock` in [`subgraph/staking-vault/subgraph.yaml`](./subgraph/staking-vault/subgraph.yaml) and redeploy the subgraph — see the [subgraph README](./subgraph/README.md#build--deployment) for details.
 
+### GitLab CI/CD
+
+The [`.gitlab-ci.yml`](./.gitlab-ci.yml) pipeline runs the frontend, contract, subgraph, and coverage checks on merge requests targeting `main` or `master`, and on pushes to those branches. To deploy from GitLab, run a pipeline from the web UI on `main` or `master`, then start the relevant manual deploy job.
+
+Add these as masked, protected CI/CD variables in GitLab:
+
+- `SEPOLIA_RPC_URL`
+- `PRIVATE_KEY`
+- `ETHERSCAN_API_KEY`
+- `GRAPH_DEPLOY_KEY`
+- `SUBGRAPH_SLUG`
+- `CODECOV_TOKEN` (optional; coverage upload is skipped if unset)
+
 ---
 
 ## 🔒 Security
