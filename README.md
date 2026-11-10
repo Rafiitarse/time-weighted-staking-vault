@@ -2,9 +2,9 @@
 
 # 🚀 Time-Weighted ETH Staking Vault
 
-**A time-weighted Ethereum staking protocol that rewards long-term conviction, not short-term capital.**
+**A lot-based ETH vault built around transferable Conviction Positions and treasury-funded rewards.**
 
-Built with Solidity and Foundry, the vault tracks every deposit as an individually-aged position (`DepositLot`) and scales yield multipliers based on precisely how long that position has been held — from 0% before 6 months up to 40% at 3+ years.
+The repository currently contains the legacy staking application and a separately deployed Conviction Vault contract system under staged development. The new CVP/CVR contracts are not yet integrated with the frontend or subgraph; reward distribution is a later upgrade stage.
 
 [![Solidity](https://img.shields.io/badge/Solidity-0.8.27-363636?style=flat-square&logo=solidity)](https://soliditylang.org/)
 [![Framework](https://img.shields.io/badge/Framework-Foundry-D64023?style=flat-square)](https://getfoundry.sh/)
@@ -49,17 +49,19 @@ Built with Solidity and Foundry, the vault tracks every deposit as an individual
 
 ## 📖 Overview
 
-Traditional staking protocols pool user deposits together, averaging out deposit times. This makes it structurally impossible to reward long-term stakers fairly — a deposit made yesterday earns the same yield as one held for three years.
+The approved Conviction Vault design keeps each deposit lot separate and represents it with a transferable **Conviction Position (`CVP`)** NFT. The position carries its remaining principal and original timestamp when transferred; only its current owner can withdraw principal.
 
-The **Time-Weighted Staking Vault** solves this with a **lot-based staking model**. Every deposit creates a dedicated `DepositLot`, recording its exact amount and timestamp on-chain. On withdrawal, the protocol computes that specific lot's maturity and mints **Reward Tokens (`RWD`)** according to a time-weighted yield multiplier — entirely independent of any other lot the user owns.
+The new **Conviction Rewards (`CVR`)** token has a fixed 10,000,000-token supply minted to the treasury at deployment. The Stage 4 vault currently provides informational reward quotes only: it does not issue CVR. Reward funding and payout integration are planned for Stage 5, so the new vault keeps deposits disabled until a compatible distributor is configured.
 
-To represent an open position, the vault issues **Staked ETH Receipts (`stETH`)**. These receipts are intentionally non-transferable (soulbound-style), so positions cannot be traded on secondary markets to farm yield or dilute protocol rewards.
+`StakingVault`, `ReceiptToken` (`stETH`), and `RewardToken` (`RWD`) remain in the repository as the legacy implementation. Their deployed metadata cannot be renamed, and the existing frontend and subgraph have not yet been migrated.
 
 ---
 
-## 🎯 Problems Solved
+## 🎯 Legacy Design Context
 
-| # | Problem | Solution |
+The following describes the legacy implementation, not the new Conviction Vault contracts.
+
+| # | Problem | Legacy solution |
 |---|---|---|
 | 1 | **Time dilution** — depositing additional funds resets or averages down the age of a user's original stake. | **Lot-based tracking.** Each deposit is isolated into its own `DepositLot`, so adding to a position never resets the maturity of earlier deposits. |
 | 2 | **Secondary-market depegging** — liquid staking receipts get traded or dumped on DEXs, causing depegs and yield-farming exploits. | **Restricted transferability.** `stETH` minting/burning is locked to the vault contract; transfers are blocked, preserving a strict 1:1 backing with locked ETH. |
@@ -67,14 +69,14 @@ To represent an open position, the vault issues **Staked ETH Receipts (`stETH`)*
 
 ---
 
-## ✨ Key Features
+## ✨ Legacy Features
 
-- **Individual Deposit Lots** — each lot packs `amount` (`uint128`) and `timestamp` (`uint64`) for gas-efficient storage.
-- **Time-Weighted Yield** — reward multipliers scale from **15%** at 6 months up to **40%** at 3+ years.
-- **Soulbound Receipts (`stETH`)** — non-transferable receipt tokens guarantee strict 1:1 accounting integrity.
+- **Individual Deposit Lots** — each legacy lot packs `amount` (`uint128`) and `timestamp` (`uint64`) for gas-efficient storage.
+- **Legacy Reward Tiers** — legacy `RWD` multipliers scale from **15%** at 6 months up to **40%** at 3+ years.
+- **Soulbound Receipts (`stETH`)** — legacy non-transferable receipt tokens represent deposited ETH.
 - **Partial Withdrawals** — withdraw a fraction of a lot without disturbing the maturity timestamp of the remaining balance.
 - **Full On-Chain Indexing** — every deposit, withdrawal, and reward event is queryable via the companion [subgraph](./subgraph/README.md).
-- **Security-Focused Design** — built on OpenZeppelin's `ReentrancyGuard`, `Pausable`, and `Ownable`.
+- **Security-Focused Design** — legacy contracts use OpenZeppelin security primitives.
 
 ---
 
@@ -95,12 +97,16 @@ This project is organized as a monorepo, keeping the core smart contracts, off-c
 │   │   └── openzeppelin-contracts # git submodule
 │   ├── remappings.txt
 │   ├── script
+│   │   ├── DeployConvictionVault.s.sol
 │   │   └── DeployStakingVault.s.sol
 │   ├── src
+│   │   ├── ConvictionRewards.sol
+│   │   ├── ConvictionVault.sol
 │   │   ├── ReceiptToken.sol
 │   │   ├── RewardToken.sol
 │   │   └── StakingVault.sol
 │   └── test
+│       ├── ConvictionVaultTest.t.sol
 │       └── VaultTest.t.sol
 ├── frontend
 │   ├── AGENTS.md
@@ -156,31 +162,36 @@ See the [subgraph README](./subgraph/README.md) for the full entity schema (`Use
 
 | Contract | Role | Summary |
 |---|---|---|
-| **`StakingVault.sol`** | Core engine | Handles ETH deposits, partial/full withdrawals, and lot accounting. Calculates age-based reward multipliers and orchestrates token minting/burning. |
-| **`ReceiptToken.sol`** (`stETH`) | Position receipt | Non-transferable ERC-20 representing a staked ETH position. Mint/burn restricted to the vault. |
-| **`RewardToken.sol`** (`RWD`) | Yield token | Standard ERC-20 minted directly to users on qualifying withdrawals. |
+| **`ConvictionVault.sol`** | New vault, Stage 4 | Custodies ETH and issues one transferable CVP NFT per deposit lot. Only the current owner can withdraw; rewards are quoted but not paid yet. |
+| **`ConvictionRewards.sol`** (`CVR`) | New reward token, Stage 4 | Fixed 10,000,000 CVR supply minted to the deployment treasury; no post-deployment mint authority. |
+| **`RewardDistributor`** | Planned, Stage 5 | Treasury-funded, all-or-zero reward payout pool; not implemented yet. CVP vault deposits remain disabled until a distributor is configured. |
+| **`StakingVault.sol`** | Legacy | Previous vault implementation; retained for historical deployments and the current legacy application. |
+| **`ReceiptToken.sol`** (`stETH`) | Legacy position receipt | Non-transferable ERC-20 receipt for positions in the old system. Existing deployed metadata cannot be changed. |
+| **`RewardToken.sol`** (`RWD`) | Legacy reward token | Token used by the old vault; not the reward token for new Conviction deployments. |
 
 ---
 
-## 📊 Reward Multiplier Tiers
+## 📊 Approved Conviction Reward Quote Tiers
 
-Rewards are calculated based on the precise holding duration of the specific lot being withdrawn from — **not** the user's account age.
+The new vault quotes a one-time bonus on the principal amount being withdrawn, based on the exact age of that position. This is **not annual yield**, and Stage 4 does not issue the quoted CVR. Stage 5 will implement the funded distributor and payout behavior.
 
-| Holding Period | Age (Days) | Multiplier (‰) | Effective Yield |
+| Holding Period | Age (Days) | Multiplier (‰) | One-time bonus |
 |---|---|---|---|
-| < 6 months | 0 – 182 | 0 | 0% |
-| 6 months | 183 – 365 | 150 | 15% |
-| 1 year | 366 – 548 | 200 | 20% |
-| 1.5 years | 549 – 731 | 250 | 25% |
-| 2 years | 732 – 914 | 300 | 30% |
-| 2.5 years | 915 – 1,097 | 350 | 35% |
-| 3+ years | 1,098+ | 400 | 40% |
+| Under 183 days | 0 – 182 | 0 | 0% |
+| 183 days | 183 – 365 | 25 | 2.5% |
+| 366 days | 366 – 548 | 50 | 5% |
+| 549 days | 549 – 731 | 75 | 7.5% |
+| 732 days | 732 – 914 | 100 | 10% |
+| 915 days | 915 – 1,097 | 125 | 12.5% |
+| 1,098+ days | 1,098+ | 150 | 15% |
 
 **Formula:**
 
 ```
-Total Reward = (Withdrawn Amount × Multiplier) / 1000
+Quoted CVR = floor(Withdrawn Principal × Multiplier / 1000)
 ```
+
+For the historical `RWD` tiers used by the legacy vault, see its source and legacy deployment documentation. Those older percentages do not describe the new CVR quote schedule.
 
 ---
 
@@ -234,6 +245,21 @@ Coverage results are automatically published to [Codecov](https://codecov.io/gh/
 
 ## 🚢 Deployment
 
+### New Conviction contracts (Stage 4)
+
+The new deployment script uses the agreed CVP/CVR identities. Provide `PRIVATE_KEY`, `TREASURY`, `SAFE_ADMIN`, and `GUARDIAN` in the environment, then run it from `contracts/`:
+
+```bash
+forge script script/DeployConvictionVault.s.sol:DeployConvictionVaultScript \
+  --rpc-url "$SEPOLIA_RPC_URL" \
+  --broadcast \
+  -vvvv
+```
+
+The script deploys CVR to the treasury and the CVP vault under Safe/guardian control. **Do not treat this as a ready-to-use deposit system:** no RewardDistributor exists until Stage 5, so deposits remain disabled. Stage 6 will integrate the new deployment with the frontend and subgraph. No deployment is authorized by this documentation.
+
+### Legacy deployment
+
 Deploy to a local Anvil instance or a live testnet using the Foundry deployment script.
 
 1. Create a `.env` file inside `contracts/` with the following variables (this file is git-ignored — never commit it):
@@ -281,10 +307,10 @@ Add these as masked, protected CI/CD variables in GitLab:
 
 ## 🔒 Security
 
-- Built on [OpenZeppelin](https://www.openzeppelin.com/contracts) primitives (`ReentrancyGuard`, `Pausable`, `AccessControlDefaultAdminRules`).
-- `stETH` transfers are hard-blocked at the token level to prevent secondary-market exploits.
-- The default admin is expected to be the protocol Safe; default-admin transfers require a 48-hour delay and acceptance by the new admin.
-- A separate guardian role can pause deposits; only the default admin can resume deposits. Withdrawals remain available while deposits are paused.
+- The new Conviction contracts use [OpenZeppelin](https://www.openzeppelin.com/contracts) primitives (`ERC721`, `ReentrancyGuard`, `Pausable`, `AccessControlDefaultAdminRules`); the delayed default-admin transfer is 48 hours.
+- CVP transfers carry the position's remaining principal and age. Approved operators can transfer NFTs but cannot withdraw; only the current owner can withdraw.
+- A separate guardian role can pause new deposits; only the default admin can resume them. Withdrawals and CVP transfers remain available while paused.
+- The legacy `stETH` token is non-transferable; this restriction applies only to the old receipt token.
 - This codebase has **not yet undergone a formal third-party audit**. Use on mainnet at your own risk until an audit report is published here.
 
 If you discover a security vulnerability, please **do not** open a public issue — report it privately to the author (see [Contact](#-author--contact)).
