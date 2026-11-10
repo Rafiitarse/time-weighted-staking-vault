@@ -3,7 +3,8 @@ pragma solidity ^0.8.27;
 
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/access/extensions/AccessControlDefaultAdminRules.sol";
+import "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 /// @title Staking Vault
 /// @author Lintar Ar' Rafii
@@ -14,6 +15,10 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 ///      minted when ETH is deposited and burned when ETH is withdrawn.
 ///      The vault is also responsible for minting reward tokens.
 interface ITokenMintable {
+    /// @notice Returns the vault authorized to manage this token.
+    /// @return The configured vault address.
+    function vault() external view returns (address);
+
     /// @notice Mints tokens to a specified address.
     /// @param to The address that will receive the minted tokens.
     /// @param amount The amount of tokens to mint.
@@ -35,8 +40,13 @@ interface ITokenMintable {
 /// @notice Manages ETH staking positions represented by individual deposit lots.
 /// @dev The vault uses a receipt token to represent deposited ETH and a reward
 ///      token to distribute rewards when users withdraw from eligible lots.
-///      Deposits and withdrawals can be paused by the owner.
-contract StakingVault is ReentrancyGuard, Pausable, Ownable {
+///      Deposits can be paused by a guardian; withdrawals remain available.
+contract StakingVault is ReentrancyGuard, Pausable, AccessControlDefaultAdminRules {
+    /// @notice Role authorized to pause deposits.
+    bytes32 public constant GUARDIAN_ROLE = keccak256("GUARDIAN_ROLE");
+
+    /// @notice Delay required before a pending default admin can take over.
+    uint48 public constant DEFAULT_ADMIN_TRANSFER_DELAY = 2 days;
 
     /// @notice The receipt token contract used to represent users' deposited ETH.
     ITokenMintable public receiptToken;
@@ -116,34 +126,85 @@ contract StakingVault is ReentrancyGuard, Pausable, Ownable {
     ///         after the receipt token has already been set.
     error TokensAlreadySet();
 
-    /// @notice Initializes the staking vault and sets the deployer as the owner.
-    constructor() Ownable(msg.sender) {}
+    /// @notice Thrown when a configured token is not a contract with the expected interface.
+    /// @param token The invalid token address.
+    error InvalidTokenContract(address token);
+
+    /// @notice Thrown when a configured token is controlled by another vault.
+    /// @param token The token whose vault reference is incorrect.
+    /// @param actualVault The vault address reported by the token.
+    error TokenVaultMismatch(address token, address actualVault);
+
+    /// @notice Thrown when a deposit exceeds the lot storage limit.
+    /// @param amount The attempted deposit amount.
+    error AmountExceedsLotLimit(uint256 amount);
+
+    /// @notice Thrown when the current timestamp cannot fit in the lot storage type.
+    /// @param timestamp The current block timestamp.
+    error TimestampExceedsLotLimit(uint256 timestamp);
+
+    /// @notice Thrown when an attempt is made to change or renounce default administration.
+    error DefaultAdminConfigurationImmutable();
+
+    /// @notice Initializes the vault and assigns delayed default administration.
+    /// @param initialAdmin The initial default admin, expected to be the protocol Safe.
+    constructor(address initialAdmin)
+        AccessControlDefaultAdminRules(DEFAULT_ADMIN_TRANSFER_DELAY, initialAdmin)
+    {}
+
+    /// @notice Keeps the approved default-admin transfer delay fixed at 48 hours.
+    function changeDefaultAdminDelay(
+        uint48 newDelay
+    ) public override onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (newDelay != DEFAULT_ADMIN_TRANSFER_DELAY) {
+            revert DefaultAdminConfigurationImmutable();
+        }
+        super.changeDefaultAdminDelay(newDelay);
+    }
+
+    /// @notice Prevents accidental loss of the authority needed to administer the vault.
+    function renounceRole(
+        bytes32 role,
+        address account
+    ) public override {
+        if (role == DEFAULT_ADMIN_ROLE) revert DefaultAdminConfigurationImmutable();
+        super.renounceRole(role, account);
+    }
 
     /// @notice Configures the receipt token and reward token contracts.
-    /// @dev Token configuration can only be performed once. The caller must
-    ///      have ownership of the vault.
+    /// @dev Token configuration can only be performed once. Both token
+    ///      contracts must be deployed, expose the expected interface, and
+    ///      identify this vault as their authorized controller.
     /// @param _receiptToken The address of the receipt token contract.
     /// @param _rewardToken The address of the reward token contract.
     function setTokens(
         address _receiptToken,
         address _rewardToken
-    ) external onlyOwner {
-        if (address(receiptToken) != address(0) || address(rewardToken) != address(0)) revert TokensAlreadySet();
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (address(receiptToken) != address(0) || address(rewardToken) != address(0)) {
+            revert TokensAlreadySet();
+        }
+        if (_receiptToken == _rewardToken) revert InvalidTokenContract(_receiptToken);
+
+        _validateToken(_receiptToken);
+        _validateToken(_rewardToken);
+
         receiptToken = ITokenMintable(_receiptToken);
         rewardToken = ITokenMintable(_rewardToken);
 
         emit TokensSet(_receiptToken, _rewardToken);
     }
 
-    /// @notice Pauses deposits and withdrawals.
-    /// @dev Only the vault owner can pause the contract.
-    function pause() external onlyOwner {
+    /// @notice Pauses new deposits.
+    /// @dev Only an account with the guardian role can pause deposits. Existing
+    ///      positions remain withdrawable while deposits are paused.
+    function pauseDeposits() external onlyRole(GUARDIAN_ROLE) {
         _pause();
     }
 
-    /// @notice Unpauses deposits and withdrawals.
-    /// @dev Only the vault owner can unpause the contract.
-    function unpause() external onlyOwner {
+    /// @notice Re-enables deposits.
+    /// @dev Only the default admin can unpause deposits.
+    function unpauseDeposits() external onlyRole(DEFAULT_ADMIN_ROLE) {
         _unpause();
     }
 
@@ -154,22 +215,24 @@ contract StakingVault is ReentrancyGuard, Pausable, Ownable {
     function deposit()
         external
         payable
-        whenNotPaused
         nonReentrant
+        whenNotPaused
     {
-        if (address(receiptToken) == address(0)) revert TokensNotSet();
+        _requireTokensSet();
         if (msg.value == 0) revert ZeroAmount();
+        if (msg.value > type(uint128).max) revert AmountExceedsLotLimit(msg.value);
+        if (block.timestamp > type(uint64).max) {
+            revert TimestampExceedsLotLimit(block.timestamp);
+        }
 
         uint256 newLotId = userLots[msg.sender].length;
 
         userLots[msg.sender].push(
             DepositLot({
-                amount: uint128(msg.value),
-                timestamp: uint64(block.timestamp)
+                amount: SafeCast.toUint128(msg.value),
+                timestamp: SafeCast.toUint64(block.timestamp)
             })
         );
-
-        receiptToken.mint(msg.sender, msg.value);
 
         emit Deposited(
             msg.sender,
@@ -177,6 +240,8 @@ contract StakingVault is ReentrancyGuard, Pausable, Ownable {
             msg.value,
             block.timestamp
         );
+
+        receiptToken.mint(msg.sender, msg.value);
     }
 
     /// @notice Calculates the reward multiplier for a deposit lot based on its age.
@@ -217,7 +282,8 @@ contract StakingVault is ReentrancyGuard, Pausable, Ownable {
     function withdrawFromLot(
         uint256 lotId,
         uint256 amount
-    ) external whenNotPaused nonReentrant {
+    ) external nonReentrant {
+        _requireTokensSet();
         if (amount == 0) revert ZeroAmount();
         if (lotId >= userLots[msg.sender].length) revert InvalidLotId();
 
@@ -235,7 +301,14 @@ contract StakingVault is ReentrancyGuard, Pausable, Ownable {
             totalReward = (amount * multiplier) / 1000;
         }
 
-        currentLot.amount -= uint128(amount);
+        currentLot.amount -= SafeCast.toUint128(amount);
+
+        emit Withdrawn(
+            msg.sender,
+            lotId,
+            amount,
+            totalReward
+        );
 
         receiptToken.burn(msg.sender, amount);
 
@@ -245,13 +318,37 @@ contract StakingVault is ReentrancyGuard, Pausable, Ownable {
 
         (bool success, ) = msg.sender.call{value: amount}("");
         if (!success) revert TransferFailed();
+    }
 
-        emit Withdrawn(
-            msg.sender,
-            lotId,
-            amount,
-            totalReward
+    function _requireTokensSet() private view {
+        if (address(receiptToken) == address(0) || address(rewardToken) == address(0)) {
+            revert TokensNotSet();
+        }
+    }
+
+    function _validateToken(address token) private view {
+        if (token == address(0) || token.code.length == 0) {
+            revert InvalidTokenContract(token);
+        }
+
+        (bool vaultCallSucceeded, bytes memory vaultData) = token.staticcall(
+            abi.encodeWithSelector(ITokenMintable.vault.selector)
         );
+        if (!vaultCallSucceeded || vaultData.length < 32) {
+            revert InvalidTokenContract(token);
+        }
+
+        address actualVault = abi.decode(vaultData, (address));
+        if (actualVault != address(this)) {
+            revert TokenVaultMismatch(token, actualVault);
+        }
+
+        (bool balanceCallSucceeded, bytes memory balanceData) = token.staticcall(
+            abi.encodeWithSelector(ITokenMintable.balanceOf.selector, address(this))
+        );
+        if (!balanceCallSucceeded || balanceData.length < 32) {
+            revert InvalidTokenContract(token);
+        }
     }
 
     /// @notice Returns all deposit lots belonging to a user.

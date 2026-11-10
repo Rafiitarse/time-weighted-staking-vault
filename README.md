@@ -241,6 +241,7 @@ Deploy to a local Anvil instance or a live testnet using the Foundry deployment 
 ```bash
 SEPOLIA_RPC_URL=
 PRIVATE_KEY=
+SAFE_ADMIN=
 ETHERSCAN_API_KEY=
 ```
 
@@ -260,6 +261,8 @@ forge script script/DeployStakingVault.s.sol:DeployVaultScript \
 
 Once deployed, update the contract `address` and `startBlock` in [`subgraph/staking-vault/subgraph.yaml`](./subgraph/staking-vault/subgraph.yaml) and redeploy the subgraph — see the [subgraph README](./subgraph/README.md#build--deployment) for details.
 
+The deployer is not the vault admin. Set `SAFE_ADMIN` to the protocol Safe address; after deployment, have that Safe call `setTokens(receiptToken, rewardToken)` using the addresses printed by the script. Deposits remain unavailable until this one-time configuration succeeds.
+
 ### GitLab CI/CD
 
 The [`.gitlab-ci.yml`](./.gitlab-ci.yml) pipeline runs the frontend, contract, subgraph, and coverage checks on merge requests targeting `main` or `master`, and on pushes to those branches. To deploy from GitLab, run a pipeline from the web UI on `main` or `master`, then start the relevant manual deploy job.
@@ -268,6 +271,7 @@ Add these as masked, protected CI/CD variables in GitLab:
 
 - `SEPOLIA_RPC_URL`
 - `PRIVATE_KEY`
+- `SAFE_ADMIN`
 - `ETHERSCAN_API_KEY`
 - `GRAPH_DEPLOY_KEY`
 - `SUBGRAPH_SLUG`
@@ -277,9 +281,10 @@ Add these as masked, protected CI/CD variables in GitLab:
 
 ## 🔒 Security
 
-- Built on audited [OpenZeppelin](https://www.openzeppelin.com/contracts) primitives (`ReentrancyGuard`, `Pausable`, `Ownable`).
+- Built on [OpenZeppelin](https://www.openzeppelin.com/contracts) primitives (`ReentrancyGuard`, `Pausable`, `AccessControlDefaultAdminRules`).
 - `stETH` transfers are hard-blocked at the token level to prevent secondary-market exploits.
-- `pause()` / `unpause()` allow the owner to halt deposits and withdrawals in an emergency.
+- The default admin is expected to be the protocol Safe; default-admin transfers require a 48-hour delay and acceptance by the new admin.
+- A separate guardian role can pause deposits; only the default admin can resume deposits. Withdrawals remain available while deposits are paused.
 - This codebase has **not yet undergone a formal third-party audit**. Use on mainnet at your own risk until an audit report is published here.
 
 If you discover a security vulnerability, please **do not** open a public issue — report it privately to the author (see [Contact](#-author--contact)).

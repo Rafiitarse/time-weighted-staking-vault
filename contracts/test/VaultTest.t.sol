@@ -49,6 +49,8 @@ contract ETHRejector {
 }
 
 contract StakingVaultMegaTest is Test {
+    event TokensSet(address indexed receiptToken, address indexed rewardToken);
+
     StakingVault vault;
     ReceiptToken receipt;
     RewardToken reward;
@@ -56,12 +58,14 @@ contract StakingVaultMegaTest is Test {
     address owner = address(this);
     address user1 = address(0x1);
     address user2 = address(0x2);
+    address guardian = address(0x3);
 
     function setUp() public {
-        vault = new StakingVault();
+        vault = new StakingVault(owner);
         receipt = new ReceiptToken(address(vault));
         reward = new RewardToken(address(vault));
         vault.setTokens(address(receipt), address(reward));
+        vault.grantRole(vault.GUARDIAN_ROLE(), guardian);
 
         vm.deal(user1, 100 ether);
         vm.deal(user2, 100 ether);
@@ -100,7 +104,7 @@ contract StakingVaultMegaTest is Test {
     }
 
     function test_Vault_Deposit_TokensNotSet_Revert() public {
-        StakingVault freshVault = new StakingVault();
+        StakingVault freshVault = new StakingVault(owner);
         vm.deal(user1, 1 ether);
         
         vm.prank(user1);
@@ -108,14 +112,14 @@ contract StakingVaultMegaTest is Test {
         freshVault.deposit{value: 1 ether}();
     }
 
-    function test_Vault_OnlyOwnerAccess_Revert() public {
+    function test_Vault_OnlyAdminAccess_Revert() public {
         vm.startPrank(user1);
 
         vm.expectRevert();
-        vault.pause();
+        vault.pauseDeposits();
 
         vm.expectRevert();
-        vault.unpause();
+        vault.unpauseDeposits();
 
         vm.expectRevert();
         vault.setTokens(address(receipt), address(reward));
@@ -124,19 +128,162 @@ contract StakingVaultMegaTest is Test {
     }
 
     function test_Vault_PausableLogic() public {
-        vault.pause();
+        vm.prank(guardian);
+        vault.pauseDeposits();
         
         vm.startPrank(user1);
         vm.expectRevert();
         vault.deposit{value: 1 ether}();
         vm.stopPrank();
 
-        vault.unpause();
+        vault.unpauseDeposits();
         
         vm.startPrank(user1);
         vault.deposit{value: 1 ether}();
         assertEq(receipt.balanceOf(user1), 1 ether);
         vm.stopPrank();
+    }
+
+    function test_Vault_AdminCannotPauseWithoutGuardianRole() public {
+        vm.expectRevert();
+        vault.pauseDeposits();
+    }
+
+    function test_Vault_WithdrawRemainsAvailableWhileDepositsPaused() public {
+        vm.prank(user1);
+        vault.deposit{value: 1 ether}();
+
+        vm.prank(guardian);
+        vault.pauseDeposits();
+
+        vm.prank(user1);
+        vault.withdrawFromLot(0, 1 ether);
+
+        assertEq(user1.balance, 100 ether);
+        assertEq(receipt.balanceOf(user1), 0);
+    }
+
+    function test_Vault_DefaultAdminTransferRequiresTwoDaysAndAcceptance() public {
+        address newAdmin = address(0x4);
+        assertEq(vault.defaultAdminDelay(), 2 days);
+
+        vault.beginDefaultAdminTransfer(newAdmin);
+        vm.prank(newAdmin);
+        vm.expectRevert();
+        vault.acceptDefaultAdminTransfer();
+
+        vm.warp(block.timestamp + 2 days + 1);
+        vm.prank(newAdmin);
+        vault.acceptDefaultAdminTransfer();
+
+        assertEq(vault.defaultAdmin(), newAdmin);
+    }
+
+    function test_Vault_DefaultAdminDelayCannotBeChangedOrRenounced() public {
+        bytes32 adminRole = vault.DEFAULT_ADMIN_ROLE();
+
+        vm.expectRevert(StakingVault.DefaultAdminConfigurationImmutable.selector);
+        vault.changeDefaultAdminDelay(1 days);
+
+        vm.expectRevert(StakingVault.DefaultAdminConfigurationImmutable.selector);
+        vault.renounceRole(adminRole, owner);
+
+        assertEq(vault.defaultAdminDelay(), 2 days);
+        assertEq(vault.defaultAdmin(), owner);
+    }
+
+    function test_Vault_TokenConfigurationRejectsInvalidAddresses() public {
+        StakingVault freshVault = new StakingVault(owner);
+        ReceiptToken validReceipt = new ReceiptToken(address(freshVault));
+        RewardToken validReward = new RewardToken(address(freshVault));
+
+        vm.expectRevert(
+            abi.encodeWithSelector(StakingVault.InvalidTokenContract.selector, address(0))
+        );
+        freshVault.setTokens(address(0), address(validReward));
+
+        vm.expectRevert(
+            abi.encodeWithSelector(StakingVault.InvalidTokenContract.selector, address(0xBEEF))
+        );
+        freshVault.setTokens(address(0xBEEF), address(validReward));
+
+        ReentrancyAttacker wrongInterface = new ReentrancyAttacker(freshVault);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                StakingVault.InvalidTokenContract.selector,
+                address(wrongInterface)
+            )
+        );
+        freshVault.setTokens(address(wrongInterface), address(validReward));
+
+        ReceiptToken wrongVaultReceipt = new ReceiptToken(address(vault));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                StakingVault.TokenVaultMismatch.selector,
+                address(wrongVaultReceipt),
+                address(vault)
+            )
+        );
+        freshVault.setTokens(address(wrongVaultReceipt), address(validReward));
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                StakingVault.InvalidTokenContract.selector,
+                address(validReceipt)
+            )
+        );
+        freshVault.setTokens(address(validReceipt), address(validReceipt));
+
+        vm.expectEmit(true, true, false, true, address(freshVault));
+        emit TokensSet(address(validReceipt), address(validReward));
+        freshVault.setTokens(address(validReceipt), address(validReward));
+        assertEq(address(freshVault.receiptToken()), address(validReceipt));
+        assertEq(address(freshVault.rewardToken()), address(validReward));
+    }
+
+    function test_Vault_DepositRejectsAmountAboveLotStorageLimit() public {
+        uint256 amount = uint256(type(uint128).max) + 1;
+        vm.deal(user1, amount);
+
+        vm.prank(user1);
+        vm.expectRevert(
+            abi.encodeWithSelector(StakingVault.AmountExceedsLotLimit.selector, amount)
+        );
+        vault.deposit{value: amount}();
+    }
+
+    function test_Vault_DepositAcceptsAmountAtLotStorageLimit() public {
+        uint128 amount = type(uint128).max;
+        vm.deal(user1, amount);
+
+        vm.prank(user1);
+        vault.deposit{value: amount}();
+
+        (uint128 storedAmount, ) = vault.userLots(user1, 0);
+        assertEq(storedAmount, amount);
+    }
+
+    function test_Vault_DepositRejectsTimestampAboveLotStorageLimit() public {
+        vm.warp(uint256(type(uint64).max) + 1);
+
+        vm.prank(user1);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                StakingVault.TimestampExceedsLotLimit.selector,
+                block.timestamp
+            )
+        );
+        vault.deposit{value: 1 wei}();
+    }
+
+    function test_Vault_DepositAcceptsTimestampAtLotStorageLimit() public {
+        vm.warp(type(uint64).max);
+
+        vm.prank(user1);
+        vault.deposit{value: 1 wei}();
+
+        (, uint64 storedTimestamp) = vault.userLots(user1, 0);
+        assertEq(storedTimestamp, type(uint64).max);
     }
 
     function test_Vault_Deposit_SuccessAndGetUserLots() public {
