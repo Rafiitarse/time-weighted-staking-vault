@@ -8,25 +8,24 @@ import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
-
-interface IRewardDistributorConfig {
-    /// @notice Returns the vault configured in the distributor.
-    function vault() external view returns (address);
-
-    /// @notice Returns the reward token configured in the distributor.
-    function rewardToken() external view returns (address);
-}
+import {IRewardDistributor, IRewardDistributorConfig} from "./RewardDistributor.sol";
 
 /// @title Conviction Vault
 /// @notice Custodies ETH and represents each deposit lot with a transferable CVP NFT.
-/// @dev Position ownership carries the right to withdraw its remaining principal.
-///      Reward quotes are informational until the distributor is integrated.
+/// @dev Position ownership carries the right to withdraw its remaining principal
+///      and receive attributable CVR rewards.
 contract ConvictionVault is ERC721, ReentrancyGuard, Pausable, AccessControlDefaultAdminRules {
     /// @notice Role authorized to pause new deposits.
     bytes32 public constant GUARDIAN_ROLE = keccak256("GUARDIAN_ROLE");
 
     /// @notice Fixed delay required for a default-admin transfer.
     uint48 public constant DEFAULT_ADMIN_TRANSFER_DELAY = 2 days;
+
+    /// @notice Reason why quoted reward was not paid during withdrawal.
+    enum RewardSkippedReason {
+        INSUFFICIENT_POOL_BALANCE,
+        DISTRIBUTOR_CALL_FAILED
+    }
 
     /// @notice Position data keyed by its unique, never-reused token ID.
     struct Position {
@@ -41,7 +40,7 @@ contract ConvictionVault is ERC721, ReentrancyGuard, Pausable, AccessControlDefa
     mapping(uint256 tokenId => Position) public positions;
 
     /// @notice Configured reward distributor; deposits are disabled until set.
-    IRewardDistributorConfig public rewardDistributor;
+    IRewardDistributor public rewardDistributor;
 
     /// @notice CVR token address reported by the configured distributor.
     address public rewardToken;
@@ -51,6 +50,17 @@ contract ConvictionVault is ERC721, ReentrancyGuard, Pausable, AccessControlDefa
 
     /// @notice Emitted when principal is withdrawn from a CVP position.
     event Withdrawn(address indexed owner, address indexed recipient, uint256 indexed tokenId, uint256 amount);
+
+    /// @notice Emitted when a maturity reward is successfully paid to the position owner.
+    event RewardPaid(address indexed owner, uint256 indexed tokenId, uint256 amount, uint256 multiplier);
+
+    /// @notice Emitted when a quoted reward could not be paid during withdrawal.
+    event RewardSkipped(
+        address indexed owner,
+        uint256 indexed tokenId,
+        uint256 requestedAmount,
+        RewardSkippedReason reason
+    );
 
     /// @notice Emitted when the one-time reward distributor configuration succeeds.
     event RewardDistributorSet(address indexed distributor, address indexed rewardToken);
@@ -141,14 +151,14 @@ contract ConvictionVault is ERC721, ReentrancyGuard, Pausable, AccessControlDefa
             revert InvalidRewardDistributor(distributor);
         }
 
-        address configuredVault;
-        address configuredRewardToken;
-        try IRewardDistributorConfig(distributor).vault() returns (address value) {
+        address configuredVault = address(0);
+        address configuredRewardToken = address(0);
+        try IRewardDistributor(distributor).vault() returns (address value) {
             configuredVault = value;
         } catch {
             revert InvalidRewardDistributor(distributor);
         }
-        try IRewardDistributorConfig(distributor).rewardToken() returns (address value) {
+        try IRewardDistributor(distributor).rewardToken() returns (address value) {
             configuredRewardToken = value;
         } catch {
             revert InvalidRewardDistributor(distributor);
@@ -161,7 +171,7 @@ contract ConvictionVault is ERC721, ReentrancyGuard, Pausable, AccessControlDefa
             revert InvalidRewardDistributor(distributor);
         }
 
-        rewardDistributor = IRewardDistributorConfig(distributor);
+        rewardDistributor = IRewardDistributor(distributor);
         rewardToken = configuredRewardToken;
         emit RewardDistributorSet(distributor, configuredRewardToken);
     }
@@ -196,7 +206,10 @@ contract ConvictionVault is ERC721, ReentrancyGuard, Pausable, AccessControlDefa
 
     /// @notice Withdraws principal from a position to a user-selected recipient.
     /// @dev Only the current NFT owner may withdraw; token approvals authorize
-    ///      transfers only. Reward payout is added in the subsequent funding stage.
+    ///      transfers only. Reward payout is requested from RewardDistributor and
+    ///      sent directly to the current owner. If the pool cannot cover the full
+    ///      reward or the distributor call fails, reward is skipped without blocking
+    ///      principal delivery.
     /// @param tokenId CVP position to withdraw from.
     /// @param amount Principal amount to withdraw in wei.
     /// @param recipient Nonzero address that will receive the ETH.
@@ -212,6 +225,8 @@ contract ConvictionVault is ERC721, ReentrancyGuard, Pausable, AccessControlDefa
         uint256 available = position.remainingPrincipal;
         if (amount > available) revert InsufficientPositionPrincipal(available, amount);
 
+        (uint256 multiplier, uint256 rewardAmount) = _calculateReward(position.depositedAt, amount);
+
         position.remainingPrincipal = SafeCast.toUint128(available - amount);
         if (amount == available) {
             delete positions[tokenId];
@@ -219,6 +234,28 @@ contract ConvictionVault is ERC721, ReentrancyGuard, Pausable, AccessControlDefa
         }
 
         emit Withdrawn(currentOwner, recipient, tokenId, amount);
+
+        if (rewardAmount > 0) {
+            try rewardDistributor.payoutReward(currentOwner, rewardAmount) returns (bool paid) {
+                if (paid) {
+                    emit RewardPaid(currentOwner, tokenId, rewardAmount, multiplier);
+                } else {
+                    emit RewardSkipped(
+                        currentOwner,
+                        tokenId,
+                        rewardAmount,
+                        RewardSkippedReason.INSUFFICIENT_POOL_BALANCE
+                    );
+                }
+            } catch {
+                emit RewardSkipped(
+                    currentOwner,
+                    tokenId,
+                    rewardAmount,
+                    RewardSkippedReason.DISTRIBUTOR_CALL_FAILED
+                );
+            }
+        }
 
         (bool success,) = recipient.call{value: amount}("");
         if (!success) revert TransferFailed(recipient, amount);
@@ -242,7 +279,20 @@ contract ConvictionVault is ERC721, ReentrancyGuard, Pausable, AccessControlDefa
             revert InsufficientPositionPrincipal(position.remainingPrincipal, amount);
         }
 
-        uint256 age = block.timestamp - position.depositedAt;
+        return _calculateReward(position.depositedAt, amount);
+    }
+
+    /// @dev Calculates the approved one-time maturity bonus for a withdrawal.
+    /// @param depositedAt Deposit timestamp of the lot.
+    /// @param amount Principal amount being withdrawn.
+    /// @return multiplier Reward multiplier in thousandths.
+    /// @return rewardAmount Reward amount in CVR wei, rounded down.
+    function _calculateReward(uint256 depositedAt, uint256 amount)
+        internal
+        view
+        returns (uint256 multiplier, uint256 rewardAmount)
+    {
+        uint256 age = block.timestamp - depositedAt;
         if (age >= 1098 days) multiplier = 150;
         else if (age >= 915 days) multiplier = 125;
         else if (age >= 732 days) multiplier = 100;

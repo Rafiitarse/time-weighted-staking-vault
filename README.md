@@ -3,7 +3,7 @@
 This repository contains two distinct systems:
 
 - The **legacy StakingVault application**: a Sepolia-configured Solidity vault, frontend, and subgraph using the legacy `stETH` receipt and `RWD` reward token.
-- The **Conviction Vault contracts**: a newer CVP/CVR contract implementation in this checkout. It is not deployed or integrated with the frontend or subgraph, and its reward distributor has not been implemented.
+- The **Conviction Vault contracts**: a newer CVP/CVR contract implementation in this checkout with an all-or-zero treasury-funded `RewardDistributor`. It is not deployed or integrated with the frontend or subgraph.
 
 The Conviction contracts are not ready for public deposits: `ConvictionVault` requires a one-time RewardDistributor configuration before deposits can be accepted. No new deployment addresses are published in this repository.
 
@@ -11,12 +11,12 @@ The Conviction contracts are not ready for public deposits: `ConvictionVault` re
 
 | Area | Current state |
 |---|---|
-| Contracts | Legacy `StakingVault` implementation and newer `ConvictionVault` / `ConvictionRewards` contracts with Foundry tests |
+| Contracts | Legacy `StakingVault` implementation and newer `ConvictionVault` / `ConvictionRewards` / `RewardDistributor` contracts with Foundry tests |
 | Frontend | Sepolia-configured legacy app; calls the legacy `StakingVault` address |
 | Subgraph | Legacy Sepolia `StakingVault` manifest and lot-oriented schema; does not index CVP NFTs |
-| Reward distributor | Not implemented |
+| Reward distributor | Implemented (`contracts/src/RewardDistributor.sol`); all-or-zero reward pool |
 | Conviction deployment | Deployment script exists, but no deployment is recorded here |
-| Upgrade progress | CVP/CVR contract implementation is awaiting user review; distributor and frontend/subgraph integration are not implemented |
+| Upgrade progress | CVP/CVR/Distributor contract implementation is awaiting user review; frontend/subgraph integration are not implemented |
 
 Both legacy client configurations point at `0x4EbF2EE5753F729F1D8C166BA36783eD35ab48Bf` on Sepolia. The subgraph manifest specifies start block `11674936`. These are repository configuration values, not confirmation that the contracts or subgraph are currently available.
 
@@ -24,11 +24,12 @@ Both legacy client configurations point at `0x4EbF2EE5753F729F1D8C166BA36783eD35
 
 | Contract | Implemented behavior |
 |---|---|
-| `contracts/src/ConvictionVault.sol` | Holds ETH and creates one transferable **Conviction Position (`CVP`)** ERC-721 per deposit. Each NFT tracks its own remaining principal and original timestamp. Only its current owner can withdraw; approved operators can transfer but cannot withdraw. |
+| `contracts/src/ConvictionVault.sol` | Holds ETH and creates one transferable **Conviction Position (`CVP`)** ERC-721 per deposit. Each NFT tracks its own remaining principal and original timestamp. Only its current owner can withdraw; approved operators can transfer but cannot withdraw. Maturity rewards are paid directly to the position owner from the distributor; pool shortages never block principal. |
 | `contracts/src/ConvictionRewards.sol` | **Conviction Rewards (`CVR`)** ERC-20 with 10,000,000 tokens minted once to a nonzero treasury at deployment. It has no post-deployment mint function. |
-| `contracts/script/DeployConvictionVault.s.sol` | Deploys CVR and the vault using `PRIVATE_KEY`, `TREASURY`, `SAFE_ADMIN`, and `GUARDIAN`. The script notes that deposits remain disabled until a distributor is configured. |
+| `contracts/src/RewardDistributor.sol` | **Reward Distributor** pool holding treasury-funded CVR. Payouts are callable only by the vault. Returns `false` without token transfers if reserves cannot cover the full quoted reward (all-or-zero). Has no owner or admin sweep authority. |
+| `contracts/script/DeployConvictionVault.s.sol` | Deploys CVR, the vault, and the distributor in sequence using `PRIVATE_KEY`, `TREASURY`, `SAFE_ADMIN`, and `GUARDIAN`. The script notes that deposits remain disabled until the Safe admin links the distributor. |
 
-The vault's reward quote is informational only in this implementation. It does not pay CVR. The approved quote is a one-time bonus on the principal being withdrawn—not annualized yield:
+The approved maturity bonus is a one-time bonus on the principal being withdrawn—not annualized yield:
 
 | Elapsed lot age | Multiplier per 1,000 | Bonus |
 |---|---:|---:|
@@ -40,7 +41,7 @@ The vault's reward quote is informational only in this implementation. It does n
 | 915 days | 125 | 12.5% |
 | 1,098 days or more | 150 | 15% |
 
-The quote formula is `floor(withdrawn principal in wei × multiplier / 1000)`. Stage 5 is planned to implement the funded distributor and reward payouts; those behaviors are not present yet.
+The formula is `floor(withdrawn principal in wei × multiplier / 1000)`. If the distributor pool has insufficient balance or fails, a reason-coded skipped-reward event is emitted, zero CVR is paid, no debt is recorded, and principal withdrawal completes normally.
 
 ## Legacy system
 
