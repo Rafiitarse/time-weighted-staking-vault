@@ -43,7 +43,7 @@ These checks do not establish a public Conviction deployment, live wallet transa
 - **Frontend:** local production build and design gate passed. Conviction transaction flows still require valid deployment metadata and a matching live deployment.
 - **Contracts:** Conviction unit, fuzz, and invariant test evidence is recorded; no public Conviction deployment is configured. The repository has no formal third-party audit report.
 - **Subgraphs:** both source packages and checks are present. The Conviction subgraph is not published; the legacy manifest does not prove a currently healthy indexer.
-- **Release:** Stage 6 is complete and awaiting user review. Stage 7 release verification and testnet rollout remain not started.
+- **Release:** Stage 6 was approved by the user after review on 2026-11-17. Stage 7 release verification and testnet rollout remain not started.
 
 ## Documentation entry points
 

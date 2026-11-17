@@ -15,7 +15,7 @@ Deposits in the Conviction Vault remain disabled until the Safe admin links the 
 | Frontend | Conviction dashboard at `/`, separate legacy Sepolia lot manager at `/legacy`, read-only operator information at `/admin` |
 | Subgraphs | Legacy Sepolia indexer and separately built Conviction CVP/CVR mapping; neither config proves a live indexer endpoint |
 | Conviction deployment | Deploy script and local Anvil demo exist; no public deployment is recorded |
-| Upgrade roadmap | Stages 1–5 approved; Stage 6 complete and awaiting user review; Stage 7 not started |
+| Upgrade roadmap | Stages 1–6 approved; Stage 7 not started |
 | Frontend design gate | Local production-browser gate passed on 2026-11-17: 0 failures, 19 non-blocking warnings |
 
 The legacy vault address is `0x4EbF2EE5753F729F1D8C166BA36783eD35ab48Bf` on Sepolia, with subgraph start block `11674936`. These are repository configuration values, not proof of current RPC, contract, or indexer availability.
