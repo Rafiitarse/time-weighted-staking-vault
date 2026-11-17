@@ -1,80 +1,76 @@
-# Conviction Vault demo runbook
+# Conviction Vault local demo
 
-One-command demo path from a clean checkout. Every number the app shows comes
-from the running Anvil chain — no mock state.
+This runbook deploys the Conviction contracts to a local Anvil chain, configures the distributor, funds the CVR pool, and runs the frontend. It does not deploy to Sepolia or any public network.
 
-## Test accounts (Anvil defaults, mnemonic `test test test test test test test test test test test junk`)
+The scripts use the standard Anvil test mnemonic and hardcoded development private keys. Use them only against the local demo node; never use these keys for real assets.
 
-| Role | Account | Key index |
-|---|---|---|
+## Accounts
+
+| Role | Address | Anvil account index |
+|---|---|---:|
 | Deployer | `0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266` | 0 |
-| Safe admin (demo: plain EOA) | `0x70997970C51812dc3A010C7d01b50e0d17dc79C8` | 1 |
-| Deposit guardian | `0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC` | 2 |
+| Demo admin (EOA, not a Safe) | `0x70997970C51812dc3A010C7d01b50e0d17dc79C8` | 1 |
+| Guardian | `0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC` | 2 |
 | CVR treasury | `0x90F79bf6EB2c4f870365E785982E1f101E93b906` | 3 |
 | Demo user | `0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65` | 4 |
 
-## Command order
+## Start the demo
+
+Run each command in `frontend/` and keep Anvil running in its own terminal:
 
 ```sh
-# 1. Start the chain (block-time 1 so log-scan indexing is fast).
 npm run demo:node
+```
 
-# 2. Deploy the three contracts; writes deployments/anvil.json.
+In a second terminal:
+
+```sh
 npm run demo:deploy
-
-# 3. Link the distributor (Safe admin) and fund the pool (treasury, full 10M CVR supply).
 npm run demo:configure
+```
 
-# 4. Run the app pointed at the demo chain.
+The deploy step writes `deployments/anvil.json`. Configuration links the distributor and funds the full 10,000,000 CVR supply. In a third terminal, start the frontend:
+
+```sh
 NEXT_PUBLIC_DEPLOYMENT=anvil npm run dev
 ```
 
-## Demo limitations
+Connect a wallet using Anvil account 4 to deposit and test positions. The `/admin` page is informational only; it does not create Safe proposals. Demo configuration uses the admin and treasury EOAs directly through the local script.
 
-* The demo "Safe admin" is a **plain EOA** (account 1). Production Safes route
-  admin actions through the admin console and the Safe Transaction Service;
-  the demo calls the same functions directly.
-* The Safe-proposal path is not exercised on Anvil (there is no hosted Safe
-  service against a local chain); the admin console falls back to its
-  calldata-builder mode, which is also what the demo shows.
+## Test a maturity tier
 
-## Time travel
+Increase local chain time after a deposit:
 
 ```sh
-npm run demo:warp -- --days 183   # reach the first tier (2.5% multiplier)
-npm run demo:warp -- --days 100   # reach the 5% tier (cumulative ages hold)
+npm run demo:warp -- --days 183
 ```
 
-Warp before or after a deposit — tier age is measured per position from its
-`depositedAt` timestamp, so warping after a deposit ages that position too.
+The first tier is 2.5%. Time is measured from each position's own deposit timestamp. Anvil time changes affect the local chain only.
 
-## Shortage path (zero-CVR withdrawal that still succeeds)
+## Test a reward-pool shortage
 
-The reward pool holds the whole 10,000,000 CVR supply by default, so a
-shortage needs a fresh, partially funded deployment:
+Start from a fresh local chain so the contract addresses and deployment metadata are regenerated. Stop Anvil, then remove the old local metadata file:
 
 ```sh
-# stop demo:node, then:
-rm deployments/anvil.json && npm run demo:node &
+rm ../deployments/anvil.json
+```
+
+Restart `npm run demo:node`, then deploy and configure with a smaller pool:
+
+```sh
 npm run demo:deploy
 DEMO_FUNDING=1000ether npm run demo:configure
 ```
 
-Then from the demo user account deposit e.g. 5000 ETH, warp 183 days, and
-withdraw the full amount: the quote (5000 × 25/1000 = 1250 CVR) exceeds the
-1000 CVR pool, so the withdrawal succeeds with **zero CVR** and the app shows
-the `RewardSkipped` outcome with reason *"Reward pool insufficient"*.
-Principal always arrives; rewards are all-or-none per withdrawal.
+Deposit at least 5,000 ETH from the demo wallet, advance 183 days, and withdraw. The quote is 1,250 CVR (`5,000 × 25 / 1,000`), which exceeds the 1,000 CVR pool. The withdrawal should return principal and pay zero CVR, with a `RewardSkipped` outcome.
 
-## Reset
+## Reset and inspect
 
-Kill the `demo:node` process, delete `deployments/anvil.json`, and start
-`npm run demo:node` again — the chain state and deployment file are regenerated
-by `demo:deploy` + `demo:configure`.
+To reset, stop Anvil, remove `../deployments/anvil.json`, and repeat the start sequence. The chain state is in Anvil memory; the metadata file is only the local deployment record.
 
-## Verification (without the app)
+With Anvil running, inspect the local contracts using Foundry Cast:
 
 ```sh
 cast call <rewardDistributor> "availableRewards()(uint256)" --rpc-url http://127.0.0.1:8545
-cast call <convictionVault>  "rewardDistributor()(address)"      --rpc-url http://127.0.0.1:8545
+cast call <convictionVault> "rewardDistributor()(address)" --rpc-url http://127.0.0.1:8545
 ```

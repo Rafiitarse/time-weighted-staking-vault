@@ -1,49 +1,48 @@
 # Conviction Vault frontend
 
-This Next.js app provides two deliberately separate surfaces:
+The Next.js app exposes three routes:
 
-- `/` — the Conviction Vault dashboard, showing the approved one-time CVR bonus tiers, live contract status, ETH deposits, and CVP positions.
-- `/legacy` — reads and manages existing deposit lots on the legacy Sepolia `StakingVault` using its `stETH` receipt and `RWD` reward tokens. Legacy positions are not migrated.
-- `/admin` — operator information; it does not submit privileged transactions.
+- `/` — Conviction dashboard with the bonus schedule, on-chain status, ETH deposit form, and CVP positions.
+- `/legacy` — Sepolia manager for existing lot positions in the legacy `StakingVault` (`stETH` receipt and `RWD` reward). Legacy positions are not migrated.
+- `/admin` — read-only operator/deployment information. The page does not create Safe proposals or send privileged transactions.
 
-Conviction contracts are not deployed to a public network in this checkout. Their addresses must come from deployment metadata. Do not treat the included Anvil example as a public deployment.
+Conviction contracts are not deployed to a public network in this checkout. The app defaults to local Anvil. Never treat the zero-address Sepolia example as a live deployment.
 
 ## Product behavior
 
-The Conviction bonus is calculated once on the principal amount withdrawn. It is not APY, interest, or a guarantee of value. ETH principal can be withdrawn at any time; maturity affects reward eligibility only. If the distributor cannot cover a full reward, CVR may be skipped while principal withdrawal proceeds. CVR has no redemption value, revenue share, or governance rights.
+Conviction's bonus is calculated once on the principal withdrawn. It is not APY, interest, or a guarantee of value. ETH principal remains withdrawable at any time; maturity changes reward eligibility only. If the reward pool cannot pay the complete CVR quote, the withdrawal can proceed with zero CVR and no unpaid reward debt. CVR has no redemption value, revenue share, or governance rights.
 
-The legacy system follows its own contract and reward rules. Its 0–40% legacy reward schedule is not the Conviction 0–15% schedule.
+The legacy system is separate and follows its own contract behavior and 0–40% reward tiers. Conviction uses the approved 0–15% tiers.
 
 ## Run locally
 
-Requires Node.js and npm. The repository `.npmrc` enables legacy peer dependency resolution.
+Requires Node.js and npm. From this directory:
 
-```bash
-cd frontend
+```sh
 npm ci
 npm run dev
 ```
 
-The default deployment is Anvil. Start the local node and deploy/configure the demo contracts with the scripts documented in [DEMO.md](./DEMO.md). Set `NEXT_PUBLIC_DEPLOYMENT=sepolia` only when the matching Conviction deployment metadata contains real addresses. `/legacy` always uses `deployments/legacy-sepolia.json` and Sepolia.
+For a fully configured on-chain demo, follow [DEMO.md](./DEMO.md). The demo uses local Anvil accounts and local chain state. `/legacy` always reads Sepolia using the canonical `deployments/legacy-sepolia.json` metadata and still needs a wallet with Sepolia access to transact.
 
 ## Configuration
 
 | Variable | Purpose |
 |---|---|
-| `NEXT_PUBLIC_DEPLOYMENT` | Conviction metadata filename/network (`anvil` or `sepolia`), default `anvil` |
-| `NEXT_PUBLIC_ANVIL_RPC_URL` | Anvil RPC, default `http://127.0.0.1:8545` |
-| `NEXT_PUBLIC_SEPOLIA_RPC_URL` | Sepolia RPC, default `https://rpc.sepolia.org` |
-| `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | Enables WalletConnect through Reown; absent means injected wallet only |
-| `NEXT_PUBLIC_APP_URL` | Public app URL used in wallet connection metadata |
+| `NEXT_PUBLIC_DEPLOYMENT` | Conviction deployment name (`anvil` or `sepolia`); defaults to `anvil` |
+| `NEXT_PUBLIC_ANVIL_RPC_URL` | Anvil RPC endpoint; defaults to `http://127.0.0.1:8545` |
+| `NEXT_PUBLIC_SEPOLIA_RPC_URL` | Sepolia RPC endpoint; defaults to `https://rpc.sepolia.org` |
+| `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | Enables Reown WalletConnect; absent means injected wallet only |
+| `NEXT_PUBLIC_APP_URL` | App URL passed to wallet connection metadata |
 
-`deployments/<network>.json` is the canonical Conviction address and start-block input. `deployments/legacy-sepolia.json` is the canonical legacy vault address, start block, and Graph endpoint. The subgraph metadata checker compares the legacy manifest to that file; the Conviction manifest renderer reads the Conviction deployment file and the frontend ABI artifacts.
+Conviction addresses and start block come from `deployments/<network>.json`. Legacy vault address, chain, start block, and Graph endpoint come from `deployments/legacy-sepolia.json`. The legacy subgraph check and Conviction manifest renderer use those sources; generated Conviction manifest/ABI/build files remain local build output.
 
 ## Checks
 
-```bash
+```sh
 npm run lint
 npm test
 npm run build
 ```
 
-The available unit suite covers metadata validation, reward tiers, error mapping, receipt parsing, and CVP event-based position discovery.
+Vitest covers metadata validation, bonus tiers, error mapping, transaction receipts, and CVP log-based position discovery. The CI also runs the Foundry and both subgraph suites; see the root `.gitlab-ci.yml`.
