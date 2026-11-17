@@ -24,6 +24,8 @@ frontend-ci:
   script:
     - cd frontend
     - npm ci --legacy-peer-deps --cache "$CI_PROJECT_DIR/.npm" --prefer-offline
+    - npm run lint
+    - npm test
     - npm run build
 
 contracts-ci:
@@ -83,6 +85,13 @@ subgraph-ci:
     - npm ci --cache "$CI_PROJECT_DIR/.npm" --prefer-offline
     - npm run codegen
     - npm run build
+    - npm run check:metadata
+    - DEPLOYMENT_METADATA=../../deployments/sepolia.json.example ALLOW_UNCONFIGURED=1 NETWORK_NAME=sepolia npm run build:conviction
+    - npm test
+    - cd ../conviction-vault
+    - npm ci --cache "$CI_PROJECT_DIR/.npm" --prefer-offline
+    - npm run codegen
+    - npm test
 
 contracts-deploy:
   stage: deploy

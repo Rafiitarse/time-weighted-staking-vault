@@ -7,15 +7,13 @@ import {
   afterAll
 } from "matchstick-as/assembly/index"
 import { Address, BigInt } from "@graphprotocol/graph-ts"
-import { Deposited } from "../generated/schema"
-import { Deposited as DepositedEvent } from "../generated/StakingVault/StakingVault"
 import { handleDeposited } from "../src/staking-vault"
 import { createDepositedEvent } from "./staking-vault-utils"
 
 // Tests structure (matchstick-as >=0.5.0)
 // https://thegraph.com/docs/en/subgraphs/developing/creating/unit-testing-framework/#tests-structure
 
-describe("Describe entity assertions", () => {
+describe("legacy StakingVault deposits", () => {
   beforeAll(() => {
     let user = Address.fromString("0x0000000000000000000000000000000000000001")
     let lotId = BigInt.fromI32(234)
@@ -29,39 +27,39 @@ describe("Describe entity assertions", () => {
     clearStore()
   })
 
-  // For more test scenarios, see:
-  // https://thegraph.com/docs/en/subgraphs/developing/creating/unit-testing-framework/#write-a-unit-test
+  test("creates the lot and updates user and protocol totals", () => {
+    assert.entityCount("DepositLot", 1)
+    assert.entityCount("User", 1)
+    assert.entityCount("ProtocolStat", 1)
 
-  test("Deposited created and stored", () => {
-    assert.entityCount("Deposited", 1)
-
-    // 0xa16081f360e3847006db660bae1c6d1b2e17ec2a is the default address used in newMockEvent() function
+    let userId = "0x0000000000000000000000000000000000000001"
+    let lotId = userId + "-234"
     assert.fieldEquals(
-      "Deposited",
-      "0xa16081f360e3847006db660bae1c6d1b2e17ec2a-1",
+      "DepositLot",
+      lotId,
       "user",
-      "0x0000000000000000000000000000000000000001"
+      userId
     )
     assert.fieldEquals(
-      "Deposited",
-      "0xa16081f360e3847006db660bae1c6d1b2e17ec2a-1",
-      "lotId",
+      "DepositLot",
+      lotId,
+      "originalAmount",
       "234"
     )
     assert.fieldEquals(
-      "Deposited",
-      "0xa16081f360e3847006db660bae1c6d1b2e17ec2a-1",
-      "amount",
+      "DepositLot",
+      lotId,
+      "remainingAmount",
       "234"
     )
     assert.fieldEquals(
-      "Deposited",
-      "0xa16081f360e3847006db660bae1c6d1b2e17ec2a-1",
-      "timestamp",
+      "DepositLot",
+      lotId,
+      "depositTimestamp",
       "234"
     )
-
-    // More assert options:
-    // https://thegraph.com/docs/en/subgraphs/developing/creating/unit-testing-framework/#asserts
+    assert.fieldEquals("User", userId, "totalEthStaked", "234")
+    assert.fieldEquals("ProtocolStat", "global", "totalEthStakedAllUsers", "234")
+    assert.fieldEquals("ProtocolStat", "global", "totalLotsCreated", "1")
   })
 })

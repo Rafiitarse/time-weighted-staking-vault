@@ -1,0 +1,16 @@
+{
+  "network": "sepolia",
+  "chainId": 11155111,
+  "contracts": {
+    "convictionVault": "0x0000000000000000000000000000000000000000",
+    "convictionRewards": "0x0000000000000000000000000000000000000000",
+    "rewardDistributor": "0x0000000000000000000000000000000000000000"
+  },
+  "treasury": "0x0000000000000000000000000000000000000000",
+  "safeAdmin": "0x0000000000000000000000000000000000000000",
+  "guardian": "0x0000000000000000000000000000000000000000",
+  "guardianIsSafe": false,
+  "startBlock": 0,
+  "depositsEnabled": false,
+  "deployedAtBlockTimestamp": 0
+}

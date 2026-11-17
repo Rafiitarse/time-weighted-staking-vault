@@ -1,0 +1,11 @@
+{
+  "network": "sepolia",
+  "chainId": 11155111,
+  "contracts": {
+    "stakingVault": "0x4EbF2EE5753F729F1D8C166BA36783eD35ab48Bf"
+  },
+  "startBlock": 11674936,
+  "graphql": {
+    "endpoint": "https://api.studio.thegraph.com/query/1760076/staking-vault/version/latest"
+  }
+}

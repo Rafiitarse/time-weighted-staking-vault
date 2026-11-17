@@ -4,6 +4,10 @@
   "scripts": {
     "codegen": "graph codegen",
     "build": "graph build",
+    "check:metadata": "node scripts/check-metadata.mjs",
+    "render:conviction": "node ../conviction-vault/scripts/render-manifest.mjs",
+    "codegen:conviction": "npm run render:conviction && graph codegen conviction-subgraph.yaml --output-dir ../conviction-vault/generated",
+    "build:conviction": "npm run render:conviction && graph codegen conviction-subgraph.yaml --output-dir ../conviction-vault/generated && graph build conviction-subgraph.yaml --output-dir ../conviction-vault/build",
     "deploy": "graph deploy --node https://api.studio.thegraph.com/deploy/ staking-vault",
     "create-local": "graph create --node http://localhost:8020/ staking-vault",
     "remove-local": "graph remove --node http://localhost:8020/ staking-vault",

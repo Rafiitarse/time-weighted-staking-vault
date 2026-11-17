@@ -99,3 +99,17 @@ Amounts are represented as `BigInt` in wei. Convert to ETH/token display units i
 ## Indexing limitation
 
 Set `startBlock` at or before the legacy vault's relevant deposit history. If a withdrawal is indexed without its deposit event, the mapping logs that the `DepositLot` is missing and cannot reconstruct the lot's remaining amount or status from that withdrawal alone.
+
+## Conviction Vault subgraph template
+
+`conviction-vault/` contains a separate CVP/CVR schema and event mapping. It tracks deposits, ERC-721 ownership transfers, principal withdrawals, paid or skipped rewards, and CVR funding. It is not deployed, and no Conviction subgraph endpoint is published.
+
+The manifest is rendered from the same `deployments/<network>.json` file used by the frontend. For an unconfigured example build, run from `subgraph/staking-vault`:
+
+```bash
+DEPLOYMENT_METADATA=../../deployments/sepolia.json.example ALLOW_UNCONFIGURED=1 NETWORK_NAME=sepolia npm run build:conviction
+```
+
+The example contains zero addresses and is only for code generation and build validation. A production manifest requires actual deployment metadata; this repository does not contain public Conviction addresses. Generated manifest, ABI copies, and Graph build output are local agent/build artifacts and are excluded from Git.
+
+The legacy `npm test` suite uses Matchstick. On a supported Linux x64 host it runs directly; on hosts without a compatible Matchstick binary, use Docker with a TTY (for example `script -qec 'npm test -- --docker' /dev/null`).

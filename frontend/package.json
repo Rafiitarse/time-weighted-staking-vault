@@ -6,11 +6,23 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "vitest run",
+    "sync:abis": "node scripts/sync-abis.mjs",
+    "demo:node": "anvil --chain-id 31337 --block-time 1 --silent",
+    "demo:deploy": "cd ../contracts && forge build && PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 TREASURY=0x90F79bf6EB2c4f870365E785982E1f101E93b906 SAFE_ADMIN=0x70997970C51812dc3A010C7d01b50e0d17dc79C8 GUARDIAN=0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC DEPLOYMENTS_DIR=../deployments forge script DeployConvictionVaultScript --rpc-url http://127.0.0.1:8545 --broadcast",
+    "demo:configure": "cd ../contracts && SAFE_ADMIN_KEY=0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d TREASURY_KEY=0x7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6 forge script DemoConfigureScript --rpc-url http://127.0.0.1:8545 --broadcast",
+    "demo:warp": "node scripts/warp.mjs"
   },
   "dependencies": {
+    "@reown/appkit": "^1.8.24",
+    "@reown/appkit-adapter-wagmi": "^1.8.24",
+    "@safe-global/api-kit": "^5.0.4",
+    "@safe-global/protocol-kit": "^8.0.11",
     "@tanstack/react-query": "^5.102.8",
-    "connectkit": "^1.9.2",
+    "@x402/core": "^2.31.0",
+    "@x402/evm": "^2.31.0",
+    "@x402/svm": "^2.31.0",
     "graphql": "^17.0.2",
     "graphql-request": "^7.4.0",
     "next": "16.3.4",
@@ -27,6 +39,8 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.4",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vite": "^8.3.8",
+    "vitest": "^5.1.0"
   }
 }

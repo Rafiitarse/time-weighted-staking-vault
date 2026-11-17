@@ -5,3 +5,7 @@ libs = ["lib"]
 solc_version = "0.8.27"
 no_match_coverage = "(test|script)"
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
+
+# The deploy script writes deployment metadata to the repo-root deployments/
+# directory (override with DEPLOYMENTS_DIR), so it needs write access there.
+fs_permissions = [{ access = "read-write", path = "../deployments" }]

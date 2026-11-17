@@ -1,0 +1,62 @@
+specVersion: 1.3.0
+description: Conviction Vault CVP positions and CVR reward accounting
+repository: https://github.com/Rafiitarse/time-weighted-staking-vault
+indexerHints:
+  prune: auto
+schema:
+  file: ../conviction-vault/schema.graphql
+dataSources:
+  - kind: ethereum/contract
+    name: ConvictionVault
+    network: __NETWORK__
+    source:
+      address: "__CONVICTION_VAULT__"
+      abi: ConvictionVault
+      startBlock: __START_BLOCK__
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - Deposit
+        - Position
+        - PositionTransfer
+        - ProtocolStats
+        - User
+        - Withdrawal
+      abis:
+        - name: ConvictionVault
+          file: ../conviction-vault/abis/ConvictionVault.json
+      eventHandlers:
+        - event: Deposited(indexed address,indexed uint256,uint256,uint256)
+          handler: handleDeposited
+        - event: Transfer(indexed address,indexed address,indexed uint256)
+          handler: handleTransfer
+        - event: Withdrawn(indexed address,indexed address,indexed uint256,uint256)
+          handler: handleWithdrawn
+        - event: RewardPaid(indexed address,indexed uint256,uint256,uint256)
+          handler: handleRewardPaid
+        - event: RewardSkipped(indexed address,indexed uint256,uint256,uint8)
+          handler: handleRewardSkipped
+      file: ../conviction-vault/src/mapping.ts
+  - kind: ethereum/contract
+    name: RewardDistributor
+    network: __NETWORK__
+    source:
+      address: "__REWARD_DISTRIBUTOR__"
+      abi: RewardDistributor
+      startBlock: __START_BLOCK__
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - ProtocolStats
+        - RewardFunding
+      abis:
+        - name: RewardDistributor
+          file: ../conviction-vault/abis/RewardDistributor.json
+      eventHandlers:
+        - event: RewardFunded(indexed address,uint256)
+          handler: handleRewardFunded
+      file: ../conviction-vault/src/mapping.ts

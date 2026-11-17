@@ -12,11 +12,11 @@ The Conviction contracts are not ready for public deposits: `ConvictionVault` re
 | Area | Current state |
 |---|---|
 | Contracts | Legacy `StakingVault` implementation and newer `ConvictionVault` / `ConvictionRewards` / `RewardDistributor` contracts with Foundry tests |
-| Frontend | Sepolia-configured legacy app; calls the legacy `StakingVault` address |
-| Subgraph | Legacy Sepolia `StakingVault` manifest and lot-oriented schema; does not index CVP NFTs |
+| Frontend | Conviction dashboard plus a separately labeled legacy Sepolia lot manager |
+| Subgraph | Legacy Sepolia indexer plus a Conviction CVP/CVR manifest template and mappings |
 | Reward distributor | Implemented (`contracts/src/RewardDistributor.sol`); all-or-zero reward pool |
 | Conviction deployment | Deployment script exists, but no deployment is recorded here |
-| Upgrade progress | CVP/CVR/Distributor contract implementation is awaiting user review; frontend/subgraph integration are not implemented |
+| Upgrade progress | Stage 6 frontend, subgraph, metadata, and documentation integration is complete and awaiting user review |
 
 Both legacy client configurations point at `0x4EbF2EE5753F729F1D8C166BA36783eD35ab48Bf` on Sepolia. The subgraph manifest specifies start block `11674936`. These are repository configuration values, not confirmation that the contracts or subgraph are currently available.
 
@@ -29,7 +29,7 @@ Both legacy client configurations point at `0x4EbF2EE5753F729F1D8C166BA36783eD35
 | `contracts/src/RewardDistributor.sol` | **Reward Distributor** pool holding treasury-funded CVR. Payouts are callable only by the vault. Returns `false` without token transfers if reserves cannot cover the full quoted reward (all-or-zero). Has no owner or admin sweep authority. |
 | `contracts/script/DeployConvictionVault.s.sol` | Deploys CVR, the vault, and the distributor in sequence using `PRIVATE_KEY`, `TREASURY`, `SAFE_ADMIN`, and `GUARDIAN`. The script notes that deposits remain disabled until the Safe admin links the distributor. |
 
-The approved maturity bonus is a one-time bonus on the principal being withdrawn—not annualized yield:
+The Conviction dashboard shows the approved one-time bonus schedule on principal being withdrawn—not annualized yield. ETH principal remains withdrawable at any time; maturity changes reward eligibility only:
 
 | Elapsed lot age | Multiplier per 1,000 | Bonus |
 |---|---:|---:|
@@ -69,7 +69,7 @@ npm ci
 npm run dev
 ```
 
-See [frontend/README.md](./frontend/README.md) for the current legacy frontend configuration and limitations.
+See [frontend/README.md](./frontend/README.md) for Conviction and legacy frontend configuration.
 
 ### Subgraph
 
@@ -86,9 +86,9 @@ See [subgraph/README.md](./subgraph/README.md) for the manifest, schema, query e
 
 ## CI and deployment
 
-The root `.gitlab-ci.yml` defines frontend build, contract build/test, coverage, and subgraph codegen/build jobs. Coverage upload is optional and requires `CODECOV_TOKEN`. Its manual deployment jobs target the legacy contracts and subgraph; there is no CVP/CVR deployment or frontend/subgraph integration job.
+The root `.gitlab-ci.yml` runs frontend lint/tests/build, contract build/tests, legacy subgraph codegen/build/metadata checks, and Conviction subgraph generation/build. Coverage upload is optional and requires `CODECOV_TOKEN`. Manual deploy jobs still target the legacy system. No public Conviction deployment is configured or implied.
 
-The legacy and Conviction deployment scripts are not evidence of a live deployment. The Conviction script only deploys CVR and the vault; it cannot enable deposits until a compatible RewardDistributor exists and is configured.
+The legacy and Conviction deployment scripts are not evidence of a live deployment. The Conviction script deploys CVR, the vault, and the RewardDistributor; deposits still require the Safe admin to configure the distributor before the vault accepts them.
 
 ## Security
 

@@ -1,0 +1,87 @@
+enum PositionStatus {
+  ACTIVE
+  CLOSED
+}
+
+enum RewardOutcome {
+  PAID
+  SKIPPED_INSUFFICIENT_POOL
+  SKIPPED_DISTRIBUTOR_FAILURE
+  NONE
+}
+
+type User @entity(immutable: false) {
+  id: Bytes!
+  totalPrincipalDeposited: BigInt!
+  totalPrincipalWithdrawn: BigInt!
+  totalRewardsPaid: BigInt!
+  positions: [Position!]! @derivedFrom(field: "owner")
+  deposits: [Deposit!]! @derivedFrom(field: "user")
+  withdrawals: [Withdrawal!]! @derivedFrom(field: "user")
+}
+
+type Position @entity(immutable: false) {
+  id: ID!
+  tokenId: BigInt!
+  depositor: Bytes!
+  owner: User
+  originalPrincipal: BigInt!
+  remainingPrincipal: BigInt!
+  depositedAt: BigInt!
+  status: PositionStatus!
+  transfers: [PositionTransfer!]! @derivedFrom(field: "position")
+  withdrawals: [Withdrawal!]! @derivedFrom(field: "position")
+}
+
+type Deposit @entity(immutable: true) {
+  id: ID!
+  user: User!
+  position: Position!
+  amount: BigInt!
+  timestamp: BigInt!
+  transactionHash: Bytes!
+  blockNumber: BigInt!
+}
+
+type PositionTransfer @entity(immutable: true) {
+  id: ID!
+  position: Position!
+  from: Bytes!
+  to: Bytes!
+  timestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type Withdrawal @entity(immutable: false) {
+  id: ID!
+  position: Position!
+  user: User!
+  recipient: Bytes!
+  principal: BigInt!
+  rewardRequested: BigInt!
+  rewardPaid: BigInt!
+  rewardOutcome: RewardOutcome!
+  timestamp: BigInt!
+  transactionHash: Bytes!
+  blockNumber: BigInt!
+}
+
+type RewardFunding @entity(immutable: true) {
+  id: ID!
+  funder: Bytes!
+  amount: BigInt!
+  timestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type ProtocolStats @entity(immutable: false) {
+  id: ID!
+  totalPrincipalDeposited: BigInt!
+  totalPrincipalWithdrawn: BigInt!
+  totalPrincipalRemaining: BigInt!
+  totalRewardsPaid: BigInt!
+  totalRewardsSkipped: BigInt!
+  totalRewardsFunded: BigInt!
+  positionCount: BigInt!
+  activePositionCount: BigInt!
+}

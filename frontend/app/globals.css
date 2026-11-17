@@ -1,26 +1,154 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* ---------------------------------------------------------------------------
+ * Design tokens — "dark fintech precision" (design draft §5).
+ * Single dark ground, hairline borders, one teal accent for primary actions
+ * and live values, compact radius, mono numerals for all chain data.
+ * ------------------------------------------------------------------------- */
+@theme {
+  --color-bg: #0a0b0d;
+  --color-surface: #121417;
+  --color-surface-raised: #171a1e;
+  --color-border: #1f2328;
+  --color-border-strong: #2b3037;
+
+  --color-ink: #e8e6e1;
+  --color-ink-muted: #9ba3ae;
+  --color-ink-faint: #6b7280;
+
+  --color-accent: #2dd4bf;
+  --color-accent-strong: #14b8a6;
+  --color-accent-ink: #0a0b0d; /* text on accent fills */
+  --color-danger: #e2725b;
+  --color-warning: #d9a441;
+  --color-ok: #6fa287;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "JetBrains Mono", monospace;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* Browser surfaces carry the design too (selection, caret, focus, scrollbar). */
+::selection {
+  background: color-mix(in oklab, var(--color-accent) 28%, transparent);
+  color: var(--color-ink);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  color-scheme: dark;
+  scrollbar-color: var(--color-border-strong) transparent;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+input,
+textarea {
+  caret-color: var(--color-accent);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--color-ink-faint);
+}
+
+/* Tabular numerals wherever chain data renders. */
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* Thin scrollbar on panels */
+.thin-scroll {
+  scrollbar-width: thin;
+}
+
+/* ---------------------------------------------------------------------------
+ * Responsive positions table (semantic <table>, stacked card layout under
+ * 640px container width: thead hidden, each row becomes a bordered card,
+ * td labels injected from data-label via ::before).
+ * ------------------------------------------------------------------------- */
+.positions-region {
+  container-type: inline-size;
+}
+
+.positions-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.positions-table th {
+  text-align: left;
+  font-weight: 500;
+  color: var(--color-ink-muted);
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+
+.positions-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: baseline;
+}
+
+.positions-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.positions-table tbody tr:hover {
+  background: color-mix(in oklab, var(--color-surface-raised) 60%, transparent);
+}
+
+@container (max-width: 639px) {
+  .positions-table thead {
+    display: none;
+  }
+
+  .positions-table tbody tr {
+    display: block;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    padding: 4px 12px;
+    margin-bottom: 10px;
+    background: var(--color-surface);
+  }
+
+  .positions-table tbody tr:hover {
+    background: var(--color-surface);
+  }
+
+  .positions-table td {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    padding: 6px 0;
+    border-bottom: 1px solid color-mix(in oklab, var(--color-border) 55%, transparent);
+  }
+
+  .positions-table td:last-child {
+    border-bottom: none;
+  }
+
+  .positions-table td::before {
+    content: attr(data-label);
+    color: var(--color-ink-muted);
+    font-size: 12px;
+    flex-shrink: 0;
+  }
 }
