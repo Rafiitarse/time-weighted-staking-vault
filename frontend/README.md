@@ -6,7 +6,7 @@ The Next.js app exposes three routes:
 - `/legacy` — Sepolia manager for existing lot positions in the legacy `StakingVault` (`stETH` receipt and `RWD` reward). Legacy positions are not migrated.
 - `/admin` — read-only operator/deployment information. The page does not create Safe proposals or send privileged transactions.
 
-Conviction contracts are not deployed to a public network in this checkout. The app defaults to local Anvil. Never treat the zero-address Sepolia example as a live deployment.
+Conviction contracts are not deployed to a public network. The app defaults to local Anvil. Never treat the zero-address Sepolia example as a live deployment.
 
 ## Product behavior
 
@@ -34,6 +34,7 @@ For a fully configured on-chain demo, follow [DEMO.md](./DEMO.md). The demo uses
 | `NEXT_PUBLIC_SEPOLIA_RPC_URL` | Sepolia RPC endpoint; defaults to `https://rpc.sepolia.org` |
 | `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | Enables Reown WalletConnect; absent means injected wallet only |
 | `NEXT_PUBLIC_APP_URL` | App URL passed to wallet connection metadata |
+| `NEXT_PUBLIC_SITE_URL` | Optional public site URL used for Next.js metadata URLs |
 
 Conviction addresses and start block come from `deployments/<network>.json`. Legacy vault address, chain, start block, and Graph endpoint come from `deployments/legacy-sepolia.json`. The legacy subgraph check and Conviction manifest renderer use those sources; generated Conviction manifest/ABI/build files remain local build output.
 
@@ -45,4 +46,4 @@ npm test
 npm run build
 ```
 
-Vitest covers metadata validation, bonus tiers, error mapping, transaction receipts, and CVP log-based position discovery. The CI also runs the Foundry and both subgraph suites; see the root `.gitlab-ci.yml`.
+Vitest covers metadata validation, bonus tiers, error mapping, transaction receipts, and CVP log-based position discovery. The GitLab pipeline runs these frontend checks, the Foundry build/tests/coverage job, and the legacy plus Conviction subgraph generation/build/test jobs. Manual deployment jobs currently deploy only the legacy system; see the root `.gitlab-ci.yml`.

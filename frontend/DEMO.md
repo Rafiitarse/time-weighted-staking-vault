@@ -59,10 +59,10 @@ Restart `npm run demo:node`, then deploy and configure with a smaller pool:
 
 ```sh
 npm run demo:deploy
-DEMO_FUNDING=1000ether npm run demo:configure
+DEMO_FUNDING=100000000000000000000 npm run demo:configure
 ```
 
-Deposit at least 5,000 ETH from the demo wallet, advance 183 days, and withdraw. The quote is 1,250 CVR (`5,000 × 25 / 1,000`), which exceeds the 1,000 CVR pool. The withdrawal should return principal and pay zero CVR, with a `RewardSkipped` outcome.
+Deposit at least 5,000 ETH from the demo wallet, advance 183 days, and withdraw. The quote is 125 CVR (`5,000 × 25 / 1,000`), which exceeds the 100 CVR pool. The withdrawal should return principal and pay zero CVR, with a `RewardSkipped` outcome.
 
 ## Reset and inspect
 

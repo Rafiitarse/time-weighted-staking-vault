@@ -5,7 +5,7 @@ This repository contains two separate staking systems:
 - **Legacy StakingVault**: the existing Sepolia deployment, frontend route at `/legacy`, and lot-based subgraph. It uses the legacy `stETH` receipt and `RWD` reward tokens.
 - **Conviction Vault**: the newer CVP position NFT, fixed-supply CVR reward token, reward distributor, dashboard, and subgraph template. Contracts and subgraph are implemented and locally tested, but Conviction has **not** been deployed to a public network.
 
-Deposits in the Conviction Vault remain disabled until the Safe admin links the RewardDistributor. There are no public Conviction contract addresses in this repository. The included zero-address Sepolia example is for build validation only.
+Deposits in the Conviction Vault remain disabled until the Safe admin links the RewardDistributor. There are no public Conviction contract addresses in this repository. The included zero-address Sepolia example is for build validation only. See [the current state and verification report](./docs/REPO-CURRENT-STATE.md) for the latest branch, UI gate, CI, and deployment evidence.
 
 ## Repository status
 
@@ -16,6 +16,7 @@ Deposits in the Conviction Vault remain disabled until the Safe admin links the 
 | Subgraphs | Legacy Sepolia indexer and separately built Conviction CVP/CVR mapping; neither config proves a live indexer endpoint |
 | Conviction deployment | Deploy script and local Anvil demo exist; no public deployment is recorded |
 | Upgrade roadmap | Stages 1–5 approved; Stage 6 complete and awaiting user review; Stage 7 not started |
+| Frontend design gate | Local production-browser gate passed on 2026-11-17: 0 failures, 19 non-blocking warnings |
 
 The legacy vault address is `0x4EbF2EE5753F729F1D8C166BA36783eD35ab48Bf` on Sepolia, with subgraph start block `11674936`. These are repository configuration values, not proof of current RPC, contract, or indexer availability.
 
