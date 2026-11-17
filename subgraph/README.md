@@ -1,6 +1,6 @@
 # Legacy StakingVault Subgraph
 
-This subgraph indexes the legacy `StakingVault` lot-based contract. It does not index the newer Conviction Vault, CVP NFT transfers, CVR, or a RewardDistributor.
+This page documents the legacy `StakingVault` subgraph. The separate Conviction subgraph template is documented at the end of this file.
 
 ## Current manifest configuration
 
@@ -46,17 +46,19 @@ Use Node.js and npm from the subgraph package directory:
 ```bash
 cd subgraph/staking-vault
 npm ci
+npm run check:metadata
 npm run codegen
 npm run build
+npm test
 ```
 
-The package also defines `npm test` (`graph test`). Its current Matchstick test is not aligned with the current schema/mapping: it asserts a `Deposited` entity, while the schema and handler create `User`, `DepositLot`, and `ProtocolStat` entities. In this environment, `npm test` also cannot obtain a Matchstick binary for Linux x64; the Graph CLI suggests `graph test -d` where Docker is available. Treat the current subgraph test as needing repair, not as passing verification.
+`check:metadata` verifies the legacy network, address, and start block against `deployments/legacy-sepolia.json`. The Matchstick suite checks that a deposit creates a lot, user, and protocol totals. On a host without a compatible Matchstick binary, run it with Docker and a TTY (for example `script -qec 'npm test -- --docker' /dev/null`).
 
-The root GitLab CI runs subgraph `npm ci`, `npm run codegen`, and `npm run build`; it does not run `npm test`.
+The root GitLab CI runs metadata validation, legacy generation/build/test, and Conviction generation/build/test.
 
 ## Deploy
 
-The root GitLab pipeline has a manual Studio deployment job for the legacy subgraph. It uses `GRAPH_DEPLOY_KEY` and `SUBGRAPH_SLUG`, runs `graph auth --studio`, and deploys with a version label. No deployment of a CVP/CVR subgraph is configured.
+The root GitLab pipeline has a manual Studio deployment job for the legacy subgraph. It uses `GRAPH_DEPLOY_KEY` and `SUBGRAPH_SLUG`, runs `graph auth --studio`, and deploys with a version label. No Conviction deployment or subgraph publication is configured. The fixed `deploy` script in the package is separate from the variable-driven GitLab job.
 
 For any legacy redeployment or replacement, update the manifest network, contract address, start block, ABI, and mapping consistently with the target contract before deploying. The package's existing `deploy` script uses a fixed `staking-vault` slug, while the GitLab job uses the `SUBGRAPH_SLUG` variable.
 
@@ -102,7 +104,7 @@ Set `startBlock` at or before the legacy vault's relevant deposit history. If a 
 
 ## Conviction Vault subgraph template
 
-`conviction-vault/` contains a separate CVP/CVR schema and event mapping. It tracks deposits, ERC-721 ownership transfers, principal withdrawals, paid or skipped rewards, and CVR funding. It is not deployed, and no Conviction subgraph endpoint is published.
+`conviction-vault/` contains a separate CVP/CVR schema and event mapping. It tracks deposits, ERC-721 ownership transfers, principal withdrawals, paid or skipped rewards, and CVR funding. The Matchstick suite exercises these accounting paths. It is not deployed, and no Conviction subgraph endpoint is published.
 
 The manifest is rendered from the same `deployments/<network>.json` file used by the frontend. For an unconfigured example build, run from `subgraph/staking-vault`:
 
@@ -110,6 +112,6 @@ The manifest is rendered from the same `deployments/<network>.json` file used by
 DEPLOYMENT_METADATA=../../deployments/sepolia.json.example ALLOW_UNCONFIGURED=1 NETWORK_NAME=sepolia npm run build:conviction
 ```
 
-The example contains zero addresses and is only for code generation and build validation. A production manifest requires actual deployment metadata; this repository does not contain public Conviction addresses. Generated manifest, ABI copies, and Graph build output are local agent/build artifacts and are excluded from Git.
+The example contains zero addresses and is only for code generation, tests, and build validation. The renderer refuses to prepare a deployable manifest from zero addresses unless `ALLOW_UNCONFIGURED=1` is explicitly supplied. A production manifest requires actual deployment metadata; this repository does not contain public Conviction addresses. Generated manifest, ABI copies, and Graph build output are local build artifacts and are excluded from Git.
 
-The legacy `npm test` suite uses Matchstick. On a supported Linux x64 host it runs directly; on hosts without a compatible Matchstick binary, use Docker with a TTY (for example `script -qec 'npm test -- --docker' /dev/null`).
+The Conviction subgraph has its own `package.json` and lockfile. From `subgraph/conviction-vault`, run `npm ci`, `npm run codegen`, and `npm test`. On hosts without a compatible Matchstick binary, use Docker with a TTY (for example `script -qec 'npm test -- --docker' /dev/null`).

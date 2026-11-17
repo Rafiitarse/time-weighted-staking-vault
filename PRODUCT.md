@@ -20,7 +20,7 @@ Each deposit is a transferable CVP position. ETH principal remains withdrawable 
 
 ## Operating Context
 
-The dashboard reads contract state and submits wallet transactions on the selected EVM chain. The current Conviction implementation is not deployed to a public network; local Anvil is the available demo deployment. The existing legacy StakingVault is configured for Sepolia and uses a separate lot-based model.
+The dashboard reads contract state and submits wallet transactions on the selected EVM chain. The current Conviction implementation is not deployed to a public network; local Anvil is the demo network. The existing legacy StakingVault is configured for Sepolia and uses a separate lot-based model. The `/admin` route provides read-only metadata and does not submit Safe proposals or privileged transactions.
 
 ## Capabilities and Constraints
 
@@ -30,6 +30,7 @@ The dashboard reads contract state and submits wallet transactions on the select
 - Only the current CVP owner can withdraw. ETH can be sent to a recipient chosen by that owner; CVR goes to the current owner.
 - The contracts are not upgradeable. Deposits stay disabled until the Safe admin configures the distributor.
 - The Conviction system and legacy Sepolia system are separate. Do not imply that old positions have migrated or that Conviction contracts are publicly deployed.
+- Conviction deployment metadata is a per-network input under `deployments/`; the checked-in Sepolia example has zero addresses and is not deployable or live configuration.
 
 ## Evidence on Hand
 
@@ -37,6 +38,8 @@ The dashboard reads contract state and submits wallet transactions on the select
 - Conviction contract implementation and Foundry suites: `contracts/src/` and `contracts/test/`.
 - Legacy Sepolia deployment configuration: `subgraph/staking-vault/subgraph.yaml` and `README.md`.
 - No production Conviction deployment addresses, testimonials, redemption value, or independent audit are recorded in this repository.
+- Stage 6 frontend/subgraph integration is implemented and awaits user review; Stage 7 rollout remains not started (`UPGRADE.md`).
+- The design-taste gate on the production local frontend reported remaining findings. A dedicated screen-reader review has not been run.
 
 ## Product Principles
 

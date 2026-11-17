@@ -1,51 +1,45 @@
 # Time-Weighted ETH Vault
 
-This repository contains two distinct systems:
+This repository contains two separate staking systems:
 
-- The **legacy StakingVault application**: a Sepolia-configured Solidity vault, frontend, and subgraph using the legacy `stETH` receipt and `RWD` reward token.
-- The **Conviction Vault contracts**: a newer CVP/CVR contract implementation in this checkout with an all-or-zero treasury-funded `RewardDistributor`. It is not deployed or integrated with the frontend or subgraph.
+- **Legacy StakingVault**: the existing Sepolia deployment, frontend route at `/legacy`, and lot-based subgraph. It uses the legacy `stETH` receipt and `RWD` reward tokens.
+- **Conviction Vault**: the newer CVP position NFT, fixed-supply CVR reward token, reward distributor, dashboard, and subgraph template. Contracts and subgraph are implemented and locally tested, but Conviction has **not** been deployed to a public network.
 
-The Conviction contracts are not ready for public deposits: `ConvictionVault` requires a one-time RewardDistributor configuration before deposits can be accepted. No new deployment addresses are published in this repository.
+Deposits in the Conviction Vault remain disabled until the Safe admin links the RewardDistributor. There are no public Conviction contract addresses in this repository. The included zero-address Sepolia example is for build validation only.
 
 ## Repository status
 
 | Area | Current state |
 |---|---|
-| Contracts | Legacy `StakingVault` implementation and newer `ConvictionVault` / `ConvictionRewards` / `RewardDistributor` contracts with Foundry tests |
-| Frontend | Conviction dashboard plus a separately labeled legacy Sepolia lot manager |
-| Subgraph | Legacy Sepolia indexer plus a Conviction CVP/CVR manifest template and mappings |
-| Reward distributor | Implemented (`contracts/src/RewardDistributor.sol`); all-or-zero reward pool |
-| Conviction deployment | Deployment script exists, but no deployment is recorded here |
-| Upgrade progress | Stage 6 frontend, subgraph, metadata, and documentation integration is complete and awaiting user review |
+| Contracts | Legacy `StakingVault` plus Conviction `ConvictionVault`, `ConvictionRewards`, and `RewardDistributor` |
+| Frontend | Conviction dashboard at `/`, separate legacy Sepolia lot manager at `/legacy`, read-only operator information at `/admin` |
+| Subgraphs | Legacy Sepolia indexer and separately built Conviction CVP/CVR mapping; neither config proves a live indexer endpoint |
+| Conviction deployment | Deploy script and local Anvil demo exist; no public deployment is recorded |
+| Upgrade roadmap | Stages 1–5 approved; Stage 6 complete and awaiting user review; Stage 7 not started |
 
-Both legacy client configurations point at `0x4EbF2EE5753F729F1D8C166BA36783eD35ab48Bf` on Sepolia. The subgraph manifest specifies start block `11674936`. These are repository configuration values, not confirmation that the contracts or subgraph are currently available.
+The legacy vault address is `0x4EbF2EE5753F729F1D8C166BA36783eD35ab48Bf` on Sepolia, with subgraph start block `11674936`. These are repository configuration values, not proof of current RPC, contract, or indexer availability.
 
-## Conviction contracts
+## Conviction system
 
-| Contract | Implemented behavior |
+| Contract | Behavior |
 |---|---|
-| `contracts/src/ConvictionVault.sol` | Holds ETH and creates one transferable **Conviction Position (`CVP`)** ERC-721 per deposit. Each NFT tracks its own remaining principal and original timestamp. Only its current owner can withdraw; approved operators can transfer but cannot withdraw. Maturity rewards are paid directly to the position owner from the distributor; pool shortages never block principal. |
-| `contracts/src/ConvictionRewards.sol` | **Conviction Rewards (`CVR`)** ERC-20 with 10,000,000 tokens minted once to a nonzero treasury at deployment. It has no post-deployment mint function. |
-| `contracts/src/RewardDistributor.sol` | **Reward Distributor** pool holding treasury-funded CVR. Payouts are callable only by the vault. Returns `false` without token transfers if reserves cannot cover the full quoted reward (all-or-zero). Has no owner or admin sweep authority. |
-| `contracts/script/DeployConvictionVault.s.sol` | Deploys CVR, the vault, and the distributor in sequence using `PRIVATE_KEY`, `TREASURY`, `SAFE_ADMIN`, and `GUARDIAN`. The script notes that deposits remain disabled until the Safe admin links the distributor. |
+| `contracts/src/ConvictionVault.sol` | Holds ETH and creates one transferable ERC-721 Conviction Position (`CVP`) per deposit. Only the current NFT owner may withdraw. Partial withdrawals preserve the position timestamp; full withdrawals burn the NFT. |
+| `contracts/src/ConvictionRewards.sol` | Fixed 10,000,000 CVR supply, minted once to the treasury. No post-deployment mint authority. |
+| `contracts/src/RewardDistributor.sol` | Permissionlessly funded CVR pool. Only the vault can request payout. Each reward is paid in full or skipped; there is no admin sweep. |
 
-The Conviction dashboard shows the approved one-time bonus schedule on principal being withdrawn—not annualized yield. ETH principal remains withdrawable at any time; maturity changes reward eligibility only:
+The bonus is a one-time amount on principal withdrawn, not annualized yield, interest, or a promise of token value. ETH principal can be withdrawn at any time; maturity affects reward eligibility only.
 
-| Elapsed lot age | Multiplier per 1,000 | Bonus |
-|---|---:|---:|
-| Under 183 days | 0 | 0% |
-| 183 days | 25 | 2.5% |
-| 366 days | 50 | 5% |
-| 549 days | 75 | 7.5% |
-| 732 days | 100 | 10% |
-| 915 days | 125 | 12.5% |
-| 1,098 days or more | 150 | 15% |
+| Elapsed position age | Bonus on withdrawn principal |
+|---|---:|
+| Under 183 days | 0% |
+| 183 days | 2.5% |
+| 366 days | 5% |
+| 549 days | 7.5% |
+| 732 days | 10% |
+| 915 days | 12.5% |
+| 1,098 days or more | 15% |
 
-The formula is `floor(withdrawn principal in wei × multiplier / 1000)`. If the distributor pool has insufficient balance or fails, a reason-coded skipped-reward event is emitted, zero CVR is paid, no debt is recorded, and principal withdrawal completes normally.
-
-## Legacy system
-
-`contracts/src/StakingVault.sol`, `contracts/src/ReceiptToken.sol`, and `contracts/src/RewardToken.sol` remain the legacy implementation. It uses per-user deposit lots and the legacy `stETH` and `RWD` tokens. Its reward tiers range from 0% before 183 days to 40% from 1,098 days. The legacy frontend and subgraph still describe and use this system. Existing deployed token metadata cannot be renamed by changing source code.
+Formula: `floor(withdrawn principal in wei × multiplier / 1000)`. If the distributor cannot cover the complete quote or its call fails, that withdrawal receives zero CVR and records no debt; principal withdrawal continues. CVR has no redemption value, revenue share, or governance rights.
 
 ## Development
 
@@ -53,51 +47,65 @@ The formula is `floor(withdrawn principal in wei × multiplier / 1000)`. If the 
 
 Requires Foundry. From the repository root:
 
-```bash
+```sh
 cd contracts
 forge build
 forge test
 ```
 
+The current suite has 75 tests, including fuzz and stateful invariant coverage.
+
 ### Frontend
 
 Requires Node.js and npm:
 
-```bash
+```sh
 cd frontend
 npm ci
 npm run dev
 ```
 
-See [frontend/README.md](./frontend/README.md) for Conviction and legacy frontend configuration.
+The default Conviction network is local Anvil. Follow [frontend/DEMO.md](./frontend/DEMO.md) to deploy and configure the demo locally. See [frontend/README.md](./frontend/README.md) for routes, configuration, and checks.
 
-### Subgraph
+### Subgraphs
 
-Requires Node.js and npm:
+The legacy package lives in `subgraph/staking-vault`; Conviction mapping and schema live in `subgraph/conviction-vault`. Build the legacy graph and validate shared metadata with:
 
-```bash
+```sh
 cd subgraph/staking-vault
 npm ci
+npm run check:metadata
 npm run codegen
 npm run build
+npm test
 ```
 
-See [subgraph/README.md](./subgraph/README.md) for the manifest, schema, query examples, and current test limitations.
+Build Conviction from the same directory using the zero-address example only for local code generation/build validation:
 
-## CI and deployment
+```sh
+DEPLOYMENT_METADATA=../../deployments/sepolia.json.example ALLOW_UNCONFIGURED=1 NETWORK_NAME=sepolia npm run build:conviction
+cd ../conviction-vault
+npm ci
+npm run codegen
+npm test
+```
 
-The root `.gitlab-ci.yml` runs frontend lint/tests/build, contract build/tests, legacy subgraph codegen/build/metadata checks, and Conviction subgraph generation/build. Coverage upload is optional and requires `CODECOV_TOKEN`. Manual deploy jobs still target the legacy system. No public Conviction deployment is configured or implied.
+See [subgraph/README.md](./subgraph/README.md) for metadata, test, and deployment details. A successful build does not mean a graph is deployed.
 
-The legacy and Conviction deployment scripts are not evidence of a live deployment. The Conviction script deploys CVR, the vault, and the RewardDistributor; deposits still require the Safe admin to configure the distributor before the vault accepts them.
+## Deployment metadata
 
-## Security
+- `deployments/legacy-sepolia.json` is the canonical address, chain, start block, and Graph endpoint for the legacy system.
+- `deployments/<network>.json` is the canonical Conviction deployment input. The checked-in `sepolia.json.example` contains zero addresses and is not a deployment.
+- Frontend metadata validation and the Conviction manifest renderer consume Conviction deployment data; the legacy metadata check guards the legacy manifest against its canonical file.
 
-The repository has not undergone a formal third-party security audit. Do not treat the Conviction contracts as production-ready. Review and test the complete reward-distribution system before any deployment or use with real funds.
+Deployment scripts do not prove a live deployment. The Conviction script deploys CVR, the vault, and the distributor; deposits require the Safe admin to configure the distributor after deployment. This repository does not publish new Conviction addresses.
+
+## CI and security
+
+`.gitlab-ci.yml` runs frontend lint/tests/build, Foundry build/tests, legacy and Conviction subgraph codegen/build/tests, and a legacy metadata check. The manual deployment jobs still target the legacy system. Coverage upload is optional and requires `CODECOV_TOKEN`.
+
+The repository has not undergone a formal third-party security audit. Do not use the Conviction contracts with real funds based on local tests alone.
 
 ## License
 
-This project is licensed under the MIT License. See [LICENSE](./LICENSE).
-
-## Author
-
-Lintar Ar' Rafii — [GitHub](https://github.com/Rafiitarse)
+MIT. See [LICENSE](./LICENSE).
