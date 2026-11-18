@@ -38,6 +38,13 @@ CVR supply is fixed at 10,000,000 tokens. Rewards come from a separately funded,
 
 These checks do not establish a public Conviction deployment, live wallet transaction behavior, external audit status, or current legacy RPC/subgraph health.
 
+## Planned Arbitrum Sepolia buildathon rollout
+
+- The planned hackathon candidate is the integrated Conviction system on Arbitrum Sepolia (chain ID `421614`); this is planning context, not a deployment record or authorization to broadcast.
+- The Conviction contracts, frontend, and subgraph are present on this integrated branch, but the inspected deployment script/frontend metadata do not yet fully support chain `421614`. Adding explicit chain support, separate deployment metadata, frontend network selection, and subgraph manifest support is required before deployment.
+- Ethereum Sepolia remains the separate legacy deployment and must not be overwritten or migrated as part of the plan.
+- Stage 7 remains `[ ] NOT STARTED`. Read [the detailed rollout plan](./ARBITRUM-SEPOLIA-PLAN.md) before work on the Arbitrum network, keys, indexer, or hosting.
+
 ## Readiness
 
 - **Frontend:** local production build and design gate passed. Conviction transaction flows still require valid deployment metadata and a matching live deployment.

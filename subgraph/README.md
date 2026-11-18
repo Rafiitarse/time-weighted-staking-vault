@@ -1,5 +1,7 @@
 # Legacy StakingVault Subgraph
 
+The Conviction subgraph template in this repository is planned for a separate Arbitrum Sepolia deployment (chain ID `421614`); it is not published, and Arbitrum Sepolia is not yet configured here. Keep the legacy Sepolia manifest and metadata unchanged. Follow [the Arbitrum Sepolia plan](../docs/ARBITRUM-SEPOLIA-PLAN.md) before extending network support or requesting an indexer deploy credential.
+
 This page documents the legacy `StakingVault` subgraph. The separate Conviction subgraph template is documented at the end of this file.
 
 ## Current manifest configuration

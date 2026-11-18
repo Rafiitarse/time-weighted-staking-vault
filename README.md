@@ -7,6 +7,8 @@ This repository contains two separate staking systems:
 
 Deposits in the Conviction Vault remain disabled until the Safe admin links the RewardDistributor. There are no public Conviction contract addresses in this repository. The included zero-address Sepolia example is for build validation only. See [the current state and verification report](./docs/REPO-CURRENT-STATE.md) for the latest branch, UI gate, CI, and deployment evidence.
 
+The planned hackathon target is a **separate Conviction deployment on Arbitrum Sepolia (chain ID 421614)**. This is a plan only: Arbitrum network support still needs to be implemented and verified, and the existing Ethereum Sepolia legacy system must remain unchanged. See [the Arbitrum Sepolia buildathon plan](./docs/ARBITRUM-SEPOLIA-PLAN.md) for source selection, network work, credential timing, deployment gates, and demo preparation.
+
 ## Repository status
 
 | Area | Current state |
@@ -15,6 +17,7 @@ Deposits in the Conviction Vault remain disabled until the Safe admin links the 
 | Frontend | Conviction dashboard at `/`, separate legacy Sepolia lot manager at `/legacy`, read-only operator information at `/admin` |
 | Subgraphs | Legacy Sepolia indexer and separately built Conviction CVP/CVR mapping; neither config proves a live indexer endpoint |
 | Conviction deployment | Deploy script and local Anvil demo exist; no public deployment is recorded |
+| Arbitrum Sepolia | Planned Conviction testnet target (421614); not yet configured or deployed |
 | Upgrade roadmap | Stages 1–6 approved; Stage 7 not started |
 | Frontend design gate | Local production-browser gate passed on 2026-11-17: 0 failures, 19 non-blocking warnings |
 

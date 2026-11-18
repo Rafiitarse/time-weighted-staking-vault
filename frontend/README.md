@@ -8,6 +8,8 @@ The Next.js app exposes three routes:
 
 Conviction contracts are not deployed to a public network. The app defaults to local Anvil. Never treat the zero-address Sepolia example as a live deployment.
 
+Arbitrum Sepolia (chain ID `421614`) is the planned Conviction testnet target, but this frontend does not yet support that network. Keep Ethereum Sepolia configuration dedicated to `/legacy`; follow [the Arbitrum Sepolia plan](../docs/ARBITRUM-SEPOLIA-PLAN.md) before adding a separate Conviction network configuration. Do not point the Conviction UI at example or legacy addresses.
+
 ## Product behavior
 
 Conviction's bonus is calculated once on the principal withdrawn. It is not APY, interest, or a guarantee of value. ETH principal remains withdrawable at any time; maturity changes reward eligibility only. If the reward pool cannot pay the complete CVR quote, the withdrawal can proceed with zero CVR and no unpaid reward debt. CVR has no redemption value, revenue share, or governance rights.
