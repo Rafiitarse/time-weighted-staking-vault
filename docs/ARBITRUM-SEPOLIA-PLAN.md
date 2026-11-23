@@ -1,6 +1,36 @@
 # Arbitrum Sepolia buildathon plan
 
-**Status:** Planning only. The Conviction contracts, frontend, and subgraph are integrated and locally tested on the `vault-documentation` history, but no Conviction deployment to Arbitrum Sepolia is recorded. This document does not authorize starting Stage 7 or broadcasting a deployment by itself.
+**Status:** Planning only. The Conviction contracts, frontend, and subgraph are integrated on `vault-documentation` at revision `13fb726` (same as the checked `origin/dev`); `main` remains legacy-only. No Conviction deployment to Arbitrum Sepolia is recorded. Stage 7 remains `[ ] NOT STARTED`. This document does not authorize starting rollout work or broadcasting a deployment by itself.
+
+## Stage 7 phases and seven-day preparation tracker
+
+Stage 7 is the rollout stage in `UPGRADE.md`. Its execution is divided into six ordered phases in this document: **Phase 0** confirm project and source; **Phase 1** implement and verify network support; **Phase 2** prepare deployment inputs; **Phase 3** deploy and configure; **Phase 4** integrate app/indexing and gather demo evidence; **Phase 5** close Stage 7 for user review. These phases do not change the roadmap stage status until the user explicitly asks to begin rollout work.
+
+The separate seven-day preparation plan is a readiness exercise, not a second numbering system for Stage 7:
+
+| Preparation day | Focus | Status |
+|---|---|---|
+| 1 | Validate the buildathon objective, rules, current repository fit, and source revision | Complete — checked 2026-11-23 |
+| 2 | Select the project scope and a substantial user-facing change | Planned |
+| 3 | Turn the selected scope into technical design and acceptance criteria | Planned |
+| 4 | Prepare Arbitrum Sepolia network, metadata, and wallet support | Planned; only after explicit Stage 7 request |
+| 5 | Verify contract, frontend, indexing, and CI paths | Planned; only after explicit Stage 7 request |
+| 6 | Walk through the testnet demo and collect evidence | Planned; requires a separately reviewed deployment |
+| 7 | Prepare and submit the project package | Planned; recheck live submission requirements |
+
+Day 1 confirms Conviction Vault as the **recommended candidate**, not as a final project selection on the user's behalf. The repo already has Solidity contracts, a frontend, a subgraph, and local test evidence. HackQuest permits an existing project only when it is adjusted during the Buildathon with more than trivial codebase development, and requires a functional, demonstrable deployment on an accepted Arbitrum chain. Therefore, chain configuration and deployment alone are not a sufficient planned contribution. A meaningful dashboard capability such as CVP transfer handling is a candidate for Day 2 scope selection; it is not approved implementation scope yet.
+
+## Buildathon objective and rules checked 2026-11-23
+
+The official event is hosted by the Arbitrum Foundation, is online, accepts Solidity and Rust, and welcomes participants globally subject to the eligibility exclusions in the terms. Participants must be at least 18; sanctioned persons/jurisdictions and certain organizer, sponsor, judge, and family members are excluded. Registration does not guarantee acceptance.
+
+Submission requirements include compliance with applicable law, original work or an existing project changed during the event with more than trivial codebase work, deployment to Arbitrum Sepolia, Arbitrum One, or a custom Orbit Chain, required documentation/access information, and a functional demo submitted on time. Arbitrum Sepolia is an accepted test network. Judging includes smart-contract quality, Arbitrum usage, product-market fit, innovation, real problem solving, impact, and presentation. The event page gives additional consideration to projects integrating Paxos USDG; this is an incentive, not an eligibility requirement, and does not by itself justify changing Conviction's approved token design.
+
+The live page lists registration from 2026-11-02 03:01 through 2027-03-01 02:59, submissions from 2027-02-08 03:01 through 2027-03-01 02:59, and a reward announcement on 2027-03-08 17:00. The official terms specify the submission deadline as 2027-02-28 23:59 BRT, equivalent to 2027-03-01 02:59 UTC. Recheck the schedule before registration/submission because the organizers may change it.
+
+The event page advertises prizes in USDC, while the official terms PDF describes the overall and Promising Products prizes and milestone grants in USDG. Treat the payment currency as unresolved and confirm it with the organizers before relying on prize details. The terms also require prize recipients to sign a grant agreement; for prize categories other than Promising Products, they describe staged payment conditions including an Arbitrum mainnet launch, mutually agreed KPIs, and Foundation investment rights. These prize conditions do not authorize mainnet work under this plan: mainnet remains out of scope and requires a separate explicit request. Participants retain their work but grant organizers, sponsors, and service providers a promotional license; the terms also permit use of participant likeness and sharing contact details with partners.
+
+**Day 1 outcome:** keep Conviction Vault as the leading candidate, retain Arbitrum Sepolia as the proposed testnet, and carry the need for a substantive Buildathon change into Day 2. Final project/scope selection remains for the user. No contract, frontend, network, deployment, registration, or submission action was taken in Day 1.
 
 ## Goal and scope
 
@@ -8,7 +38,7 @@ Prepare the integrated Conviction Vault system for a hackathon demo on **Arbitru
 
 The existing legacy deployment is on **Ethereum Sepolia**, chain ID **11155111**. It is a separate system and does not qualify as an Arbitrum deployment. Keep its addresses, metadata, frontend route, and indexer configuration intact. The Arbitrum work must use its own named deployment metadata, RPC configuration, frontend network selection, and indexer configuration.
 
-The HackQuest page says existing projects are welcome and that a qualifying project must be deployed to an Arbitrum chain; it explicitly lists Arbitrum Sepolia. The page currently lists registration through March 1, 2027 and submissions February 8–March 1, 2027. Recheck the live page before relying on the dates or rules: [Arbitrum Open House São Paulo: Online Buildathon](https://www.hackquest.io/hackathons/Arbitrum-Open-House-Sao-Paulo-Online-Buildathon) (checked November 18, 2026).
+The HackQuest page and official terms were checked on November 23, 2026. Existing projects are allowed if they receive more than trivial codebase development during the Buildathon; submissions must be functional, demonstrable, documented, and deployed on an accepted Arbitrum chain. The live schedule currently lists registration through March 1, 2027 and submissions February 8–March 1, 2027; the terms specify the deadline as February 28 at 11:59 PM BRT (March 1 at 02:59 UTC). The page and terms disagree on prize currency (USDC vs USDG). Recheck the live [event page](https://www.hackquest.io/hackathons/Arbitrum-Open-House-Sao-Paulo-Online-Buildathon) and [official terms](https://openhouse.arbitrum.io/sao_paulo_version_open_house_buildathon_terms_and_conditions.pdf) before relying on rules, dates, or prize details.
 
 ## Chain facts
 
