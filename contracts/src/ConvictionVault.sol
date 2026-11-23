@@ -101,8 +101,8 @@ contract ConvictionVault is ERC721, ReentrancyGuard, Pausable, AccessControlDefa
     /// @notice Thrown when the default-admin delay is changed or default admin renounced.
     error DefaultAdminConfigurationImmutable();
 
-    /// @notice Creates the CVP collection and assigns the Safe and guardian roles.
-    /// @param initialAdmin Safe address that will administer the vault.
+    /// @notice Creates the CVP collection and assigns default-admin and guardian roles.
+    /// @param initialAdmin Initial default-admin address; deployment is expected to supply the protocol Safe.
     /// @param initialGuardian Separate address authorized to pause deposits.
     constructor(address initialAdmin, address initialGuardian)
         ERC721("Conviction Position", "CVP")

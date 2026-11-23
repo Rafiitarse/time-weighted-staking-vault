@@ -8,7 +8,7 @@ web
 
 ## Users
 
-People evaluating the Conviction Vault and ETH holders who use its web dashboard to open, review, transfer, and withdraw Conviction Positions. Existing Sepolia users need a separate legacy surface to review and withdraw positions in the older StakingVault.
+People evaluating the Conviction Vault and ETH holders who use its web dashboard to open, review, and withdraw Conviction Positions. CVP is transferable as an ERC-721, but the dashboard currently has no transfer action. Existing Sepolia users need a separate legacy surface to review and withdraw positions in the older StakingVault.
 
 ## Product Purpose
 
@@ -27,8 +27,8 @@ The dashboard reads contract state and submits wallet transactions on the select
 - Conviction Vault uses CVP ERC-721 positions, CVR ERC-20 rewards, and a separately funded RewardDistributor.
 - The maximum CVR supply is 10,000,000 tokens. The one-time bonus tiers range from 0% before 183 days to 15% from 1,098 days; the bonus is not annualized yield or a claim about token value.
 - A CVR pool shortage never blocks principal withdrawal. If the distributor cannot pay the complete quote, that withdrawal receives zero CVR and creates no reward debt.
-- Only the current CVP owner can withdraw. ETH can be sent to a recipient chosen by that owner; CVR goes to the current owner.
-- The contracts are not upgradeable. Deposits stay disabled until the Safe admin configures the distributor.
+- Only the current CVP owner can withdraw. ETH can be sent to a recipient chosen by that owner; CVR goes to the current owner. CVP transfers use standard ERC-721 wallet interactions; the dashboard does not submit them.
+- The contracts are not upgradeable. Deposits stay disabled until the configured admin links the distributor. The vault assigns admin and guardian roles to constructor-supplied addresses and does not verify that they are Safe multisigs; multisig control depends on deploying with the intended Safe addresses.
 - The Conviction system and legacy Sepolia system are separate. Do not imply that old positions have migrated or that Conviction contracts are publicly deployed.
 - Conviction deployment metadata is a per-network input under `deployments/`; the checked-in Sepolia example has zero addresses and is not deployable or live configuration.
 
@@ -38,8 +38,8 @@ The dashboard reads contract state and submits wallet transactions on the select
 - Conviction contract implementation and Foundry suites: `contracts/src/` and `contracts/test/`.
 - Legacy Sepolia deployment configuration: `subgraph/staking-vault/subgraph.yaml` and `README.md`.
 - No production Conviction deployment addresses, testimonials, redemption value, or independent audit are recorded in this repository.
-- Stage 6 frontend/subgraph integration is implemented and awaits user review; Stage 7 rollout remains not started (`UPGRADE.md`).
-- The design-taste gate on the production local frontend reported remaining findings. A dedicated screen-reader review has not been run.
+- Stage 6 frontend/subgraph integration was reviewed and approved by the user on 2026-11-17. Stage 7 release verification and testnet rollout remain not started (`UPGRADE.md`). The integrated runtime baseline is `3778847` on `origin/dev`; `main` remains the legacy-only base.
+- The local production-browser design gate passed on 2026-11-17 with zero failures and 19 non-blocking warnings. A dedicated screen-reader review has not been run; the gate result is not release verification.
 
 ## Product Principles
 

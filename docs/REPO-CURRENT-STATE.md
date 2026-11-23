@@ -1,6 +1,6 @@
 # Repository state and deployment readiness
 
-Checked 2026-11-17 on `vault-documentation`, based on the Stage 6 integration at `frontend-redesign` / `origin/dev` (`47f4f923`). This report describes the integrated checkout, not the legacy-only `main` branch.
+Checked 2026-11-23 on `docs-sync-stage6-evidence` against runtime source revision `3778847` (the same revision as `origin/dev`, based on `vault-documentation`). This report describes that integrated source checkout, not the legacy-only `main` branch. The current branch contains documentation updates and a NatSpec clarification; no runtime logic changed.
 
 ## Integrated systems
 
@@ -34,7 +34,7 @@ CVR supply is fixed at 10,000,000 tokens. Rewards come from a separately funded,
 - Stage 5 contract verification recorded 75 passing Foundry tests, including fuzz and stateful invariant coverage (128,000 calls).
 - Stage 6 recorded 42 passing frontend tests, successful frontend lint and production build, and passing legacy and Conviction subgraph generation/build/test workflows.
 - On 2026-11-17, the local production-browser design gate reported `GATE: PASS`, zero failures and 19 non-blocking warnings. This is local UI evidence; a screen-reader review was not performed.
-- The GitLab pipeline on this branch runs frontend lint/tests/build, Foundry build/tests/coverage, and both subgraph test/build workflows. Its manual deploy jobs currently target the legacy system.
+- The GitLab CI configuration defines frontend lint/tests/build, Foundry build/tests/coverage, and both subgraph test/build workflows. Its workflow rules run for merge requests targeting `main`/`master` and for those branches; its manual deploy jobs currently target the legacy system.
 
 These checks do not establish a public Conviction deployment, live wallet transaction behavior, external audit status, or current legacy RPC/subgraph health.
 
@@ -48,9 +48,9 @@ These checks do not establish a public Conviction deployment, live wallet transa
 ## Readiness
 
 - **Frontend:** local production build and design gate passed. Conviction transaction flows still require valid deployment metadata and a matching live deployment.
-- **Contracts:** Conviction unit, fuzz, and invariant test evidence is recorded; no public Conviction deployment is configured. The repository has no formal third-party audit report.
+- **Contracts:** Conviction unit, fuzz, and invariant test evidence is recorded; no public Conviction deployment is configured. The vault accepts constructor-supplied admin and guardian addresses without verifying that either address is a Safe multisig; deployment must use the intended Safe addresses for multisig control. The metadata field `guardianIsSafe` only reflects whether the guardian address has code, not whether it is a verified Safe. The repository has no formal third-party audit report.
 - **Subgraphs:** both source packages and checks are present. The Conviction subgraph is not published; the legacy manifest does not prove a currently healthy indexer.
-- **Release:** Stage 6 was approved by the user after review on 2026-11-17. Stage 7 release verification and testnet rollout remain not started.
+- **Release:** Stage 6 was approved by the user after review on 2026-11-17. Stage 7 release verification and testnet rollout remain not started. No public Conviction deployment is recorded.
 
 ## Documentation entry points
 
